@@ -9,6 +9,7 @@ dependencies:
 - pip
 - pip:
   - gymnasium==0.28.1
+  - pygame==2.4.0
   # - mujoco-py==2.0.2.13
   - numpy==1.24.3
   - torch==2.0.0

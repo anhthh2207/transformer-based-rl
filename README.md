@@ -13,3 +13,7 @@ Final Project COMP2050 - VinUniversity
 conda env create -f environment.yml
 conda activate transformer-based-rl
 ```
+Install box2d for Windows:
+```bash
+pip install ufal.pybox2d
+```
