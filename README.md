@@ -13,7 +13,9 @@ Final Project COMP2050 - VinUniversity
 conda env create -f environment.yml
 conda activate transformer-based-rl
 ```
-Install box2d for Windows:
+Installing box2d for Windows:
 ```bash
 pip install ufal.pybox2d
 ```
+Useful links for troubleshooting the atari environment installation: [1](https://stackoverflow.com/questions/63080326/could-not-find-module-atari-py-ale-interface-ale-c-dll-or-one-of-its-dependenc) 
+[2](https://stackoverflow.com/questions/69442971/error-in-importing-environment-openai-gym)
