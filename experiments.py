@@ -8,6 +8,7 @@ def experiment(variant):
     game, dataset = variant['game'], variant['dataset']
     model_type = variant['model_type']
 
+    # Initiate the environment
     if game == 'boxing':
         env = gym.make('ALE/Boxing-v5', render_mode="human")
     elif game == 'casino':
@@ -23,10 +24,8 @@ def experiment(variant):
     
     observation, info = env.reset()
     
-    state_dim = env.observation_space.shape[0]
-    # act_dim = env.action_space.shape[0]
-    print(env.action_space)
-    print(env.observation_space)
+    state_dim = env.observation_space.shape[0] # state dimension
+    act_dim = env.action_space.n # action dimension
 
     for i in range(1000):
         action = env.action_space.sample()
