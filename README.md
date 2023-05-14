@@ -23,22 +23,15 @@ Useful links for troubleshooting the atari environment installation: [1](https:/
 [2](https://stackoverflow.com/questions/69442971/error-in-importing-environment-openai-gym)
 
 ### Download Dataset
-
-Create a directory for the dataset and load the dataset using [gsutil](https://cloud.google.com/storage/docs/gsutil_install#install). Replace `[DIRECTORY_NAME]` and `[GAME_NAME]` accordingly (e.g., `./dqn_replay` for `[DIRECTORY_NAME]` and `Breakout` for `[GAME_NAME]`)
 ```bash
-mkdir [DIRECTORY_NAME]
-gsutil -m cp -R gs://atari-replay-datasets/dqn/[GAME_NAME] [DIRECTORY_NAME]
+pip install git+https://github.com/takuseno/d4rl-atari
+python .\data\download_dataset.py
 ```
 
-### Run Conservative Q-Learning
+### Run Experiment
 ```bash
-
+python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 ```
-### Run Decision Transformer
+Example:
 ```bash
-
-```
-### Run Trajectory Transformer
-```bash
-
-```
+python experiments.py --game casino --dataset medium --model_type decision_transformer
