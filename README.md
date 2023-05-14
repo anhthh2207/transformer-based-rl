@@ -15,7 +15,7 @@ Create new environment
 conda env create -f environment.yml
 conda activate transformer-based-rl
 ```
-Installing box2d for Windows:
+Install box2d for Windows:
 ```bash
 pip install ufal.pybox2d
 ```
@@ -24,8 +24,9 @@ Useful links for troubleshooting the atari environment installation: [1](https:/
 
 ### Download Dataset
 ```bash
+cd data
 pip install git+https://github.com/takuseno/d4rl-atari
-python .\data\download_dataset.py
+python download_dataset.py
 ```
 
 ### Run Experiment
