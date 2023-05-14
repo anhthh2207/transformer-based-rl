@@ -4,7 +4,7 @@ Final Project COMP2050 - VinUniversity
 
 **Team**: Tran Quoc Bao, Tran Huy Hoang Anh, Le Chi Cuong
 
-**Description**: We reimplement three SOTA reinforcement learning models including Decision Transformer, Trajectory Transformer, and Conservative Q-Learning. Then, they are tested on different games on the Gymnasium environment to compare their performance.
+**Description**: We reimplement three SOTA reinforcement learning models including Decision Transformer, Trajectory Transformer, and Conservative Q-Learning. Then, they are tested on different games on the Atari Gymnasium environment to compare their performance.
 
 ## How to run
 
@@ -32,6 +32,13 @@ python .\data\download_dataset.py
 ```bash
 python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 ```
-Example:
+
+**Available games**: boxing, casino, alien, adventure, breakout
+
+**Data types**: mixed, medium, expert
+
+**Model types**: conservative_q_learning, decision_transformer, trajectory_transformer
+
+**Example**:
 ```bash
 python experiments.py --game casino --dataset medium --model_type decision_transformer
