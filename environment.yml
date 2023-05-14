@@ -2,7 +2,7 @@ name: transformer-based-rl
 channels:
 - pytorch
 dependencies:
-- python=3.10.9
+- python=3.8.10
 - anaconda
 # - cudatoolkit=10.
 - numpy
@@ -11,7 +11,6 @@ dependencies:
   - gymnasium==0.28.1
   - pygame==2.4.0
   - atari-py==0.2.9
-  # - mujoco-py==2.0.2.13
   - numpy==1.24.3
   - torch==2.0.0
   - transformers==4.29.1
