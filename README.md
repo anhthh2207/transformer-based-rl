@@ -9,6 +9,8 @@ Final Project COMP2050 - VinUniversity
 ## How to run
 
 ### Setup Environment
+
+Create new environment
 ```bash
 conda env create -f environment.yml
 conda activate transformer-based-rl
@@ -19,3 +21,24 @@ pip install ufal.pybox2d
 ```
 Useful links for troubleshooting the atari environment installation: [1](https://stackoverflow.com/questions/63080326/could-not-find-module-atari-py-ale-interface-ale-c-dll-or-one-of-its-dependenc) 
 [2](https://stackoverflow.com/questions/69442971/error-in-importing-environment-openai-gym)
+
+### Download Dataset
+
+Create a directory for the dataset and load the dataset using [gsutil](https://cloud.google.com/storage/docs/gsutil_install#install). Replace `[DIRECTORY_NAME]` and `[GAME_NAME]` accordingly (e.g., `./dqn_replay` for `[DIRECTORY_NAME]` and `Breakout` for `[GAME_NAME]`)
+```bash
+mkdir [DIRECTORY_NAME]
+gsutil -m cp -R gs://atari-replay-datasets/dqn/[GAME_NAME] [DIRECTORY_NAME]
+```
+
+### Run Conservative Q-Learning
+```bash
+
+```
+### Run Decision Transformer
+```bash
+
+```
+### Run Trajectory Transformer
+```bash
+
+```
