@@ -1,4 +1,5 @@
-import gymnasium as gym
+# import gymnasium as gym
+import gym
 import argparse
 
 def experiment(variant):
@@ -10,29 +11,31 @@ def experiment(variant):
 
     # Initiate the environment
     if game == 'boxing':
-        env = gym.make('ALE/Boxing-v5', render_mode="human")
-    elif game == 'casino':
-        env = gym.make('ALE/Casino-v5', render_mode="human")
+        env = gym.make('Boxing-v4')
+    elif game == 'asterix':
+        env = gym.make('Asterix-v4')
     elif game == 'alien':
-        env = gym.make('ALE/Alien-v5', render_mode="human")
+        env = gym.make('Alien-v4')
     elif game == 'adventure':
-        env = gym.make('ALE/Adventure-v5', render_mode="human")
+        env = gym.make('Adventure-v4')
     elif game == 'breakout':
-        env = gym.make('ALE/Breakout-v5', render_mode="human")
+        env = gym.make('Breakout-v4')
     else:
         raise NotImplementedError
     
-    observation, info = env.reset()
+    env.reset()
     
     state_dim = env.observation_space.shape[0] # state dimension
     act_dim = env.action_space.n # action dimension
 
     for i in range(1000):
         action = env.action_space.sample()
-        observation, reward, terminated, truncated, info = env.step(action)
+        observation, reward, terminated, info = env.step(action)
 
-        if terminated or truncated:
-            observation, info = env.reset()
+        env.render()
+
+        if terminated:
+            env.reset()
 
         if (i+1) % 100 == 0:
             print(reward)
@@ -41,7 +44,7 @@ def experiment(variant):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--game', type=str, default='boxing', help='Available games: boxing, casino, alien, adventure, breakout')
+    parser.add_argument('--game', type=str, default='boxing', help='Available games: boxing, asterix, alien, adventure, breakout')
     parser.add_argument('--dataset', type=str, default='medium', help='Dataset types: mixed, medium, expert') 
     parser.add_argument('--mode', type=str, default='normal')  # normal for standard setting, delayed for sparse
     parser.add_argument('--K', type=int, default=20)
@@ -53,7 +56,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_head', type=int, default=1)
     parser.add_argument('--activation_function', type=str, default='relu')
     parser.add_argument('--dropout', type=float, default=0.1)
-    parser.add_argument('--learning_rate', '-lr', type=float, default=1e-4)
+    parser.add_argument('--learnnig_rate', '-lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=10000)
     parser.add_argument('--num_eval_episodes', type=int, default=100)

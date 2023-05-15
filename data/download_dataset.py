@@ -1,4 +1,4 @@
-import gymnasium as gym
+import gym
 import numpy as np
 
 import collections
@@ -9,7 +9,7 @@ import d4rl_atari as d4rl
 
 datasets = []
 
-for env_name in ['boxing', 'casino', 'alien', 'adventure', 'breakout']:
+for env_name in ['boxing', 'asterix', 'alien', 'adventure', 'breakout']:
 	for dataset_type in ['mixed', 'medium', 'expert']:
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name)
