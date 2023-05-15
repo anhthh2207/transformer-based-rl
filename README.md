@@ -15,16 +15,9 @@ Create new environment
 conda env create -f environment.yml
 conda activate transformer-based-rl
 ```
-Install atari:
-```bash
-pip install gymnasium[atari]
-pip install autorom[accept-rom-license]
-```
-Useful links for troubleshooting: [1](https://stackoverflow.com/questions/63080326/could-not-find-module-atari-py-ale-interface-ale-c-dll-or-one-of-its-dependenc) 
-[2](https://stackoverflow.com/questions/69442971/error-in-importing-environment-openai-gym)
+In order to use atari, you must import ROMS following [this instruction](https://github.com/openai/atari-py#roms)
 
 ### Download Dataset
-Import ROMS following [this instruction](https://github.com/openai/atari-py#roms)
 ```bash
 cd data
 pip install git+https://github.com/takuseno/d4rl-atari

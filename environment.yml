@@ -8,10 +8,9 @@ dependencies:
 - numpy
 - pip
 - pip:
-  # - gymnasium==0.28.1
   - gym==0.17.2
   - pygame==2.4.0
-  # - atari-py==0.2.9
+  - atari-py==0.2.9
   - numpy==1.24.3
   - torch==2.0.0
   - transformers==4.29.1
