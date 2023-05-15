@@ -37,4 +37,4 @@ python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 
 **Example**:
 ```bash
-python experiments.py --game boxing --dataset medium --model_type decision_transformer
+python experiments.py --game boxing --dataset mixed --model_type decision_transformer

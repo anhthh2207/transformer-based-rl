@@ -1,4 +1,3 @@
-# import gymnasium as gym
 import gym
 import argparse
 
@@ -45,7 +44,7 @@ def experiment(variant):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default='boxing', help='Available games: boxing, asterix, alien, adventure, breakout')
-    parser.add_argument('--dataset', type=str, default='medium', help='Dataset types: mixed, medium, expert') 
+    parser.add_argument('--dataset', type=str, default='mixed', help='Dataset types: mixed, medium, expert') 
     parser.add_argument('--mode', type=str, default='normal')  # normal for standard setting, delayed for sparse
     parser.add_argument('--K', type=int, default=20)
     parser.add_argument('--pct_traj', type=float, default=1.)

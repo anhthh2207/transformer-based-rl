@@ -4,13 +4,15 @@ import numpy as np
 import collections
 import pickle
 
-import d4rl_atari as d4rl
+import d4rl_atari
 
 
 datasets = []
 
-for env_name in ['boxing', 'asterix', 'alien', 'adventure', 'breakout']:
-	for dataset_type in ['mixed', 'medium', 'expert']:
+# for env_name in ['boxing', 'asterix', 'alien', 'adventure', 'breakout']:
+for env_name in ['boxing']:
+	# for dataset_type in ['mixed', 'medium', 'expert']:
+	for dataset_type in ['mixed']:
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name)
 		dataset = env.get_dataset()
@@ -31,7 +33,13 @@ for env_name in ['boxing', 'asterix', 'alien', 'adventure', 'breakout']:
 			else:
 				final_timestep = (episode_step == 1000-1)
 			for k in ['observations', 'next_observations', 'actions', 'rewards', 'terminals']:
-				data_[k].append(dataset[k][i])
+				if k == 'next_observations':
+					try:
+						data_[k].append(dataset['observations'][i+1])
+					except IndexError:
+						data_[k].append(dataset['observations'][i])
+				else:
+					data_[k].append(dataset[k][i])
 			if done_bool or final_timestep:
 				episode_step = 0
 				episode_data = {}
