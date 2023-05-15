@@ -29,7 +29,7 @@ python download_dataset.py
 python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 ```
 
-**Available games**: boxing, casino, alien, adventure, breakout
+**Available games**: boxing, asterix, alien, adventure, breakout
 
 **Data types**: mixed, medium, expert
 
@@ -37,4 +37,4 @@ python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 
 **Example**:
 ```bash
-python experiments.py --game casino --dataset medium --model_type decision_transformer
+python experiments.py --game boxing --dataset medium --model_type decision_transformer
