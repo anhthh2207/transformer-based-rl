@@ -29,20 +29,20 @@ python download_dataset.py
 python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 ```
 
-**Game options**: `boxing`, `alien`, `breakout`.
+**Game options**: `boxing`, `alien`, `breakout`
 
-**Data options**: `mixed`, `medium`, `expert`.
+**Data options**: `mixed`, `medium`, `expert`
 
 - `mixed` denotes datasets collected at the first 1M steps.
 - `medium` denotes datasets collected at between 9M steps and 10M steps.
 - `expert` denotes datasets collected at the last 1M steps.
 
 
-**Model options**: `conservative_q_learning`, `decision_transformer`, `trajectory_transformer`. 
+**Model options**: `conservative_q_learning`, `decision_transformer`, `trajectory_transformer` 
 
-- [Conservative Q Learning](conservative-q-learning\README.md)
-- [Decision Transformer](decision-transformer\README.md)
-- [Trajectory Transformer](trajectory-transformer\README.md)
+- [Conservative Q Learning](conservative-q-learning/README.md)
+- [Decision Transformer](decision-transformer/README.md)
+- [Trajectory Transformer](trajectory-transformer/README.md)
 
 **Example**:
 ```bash
