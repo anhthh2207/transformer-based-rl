@@ -11,12 +11,8 @@ def experiment(variant):
     # Initiate the environment
     if game == 'boxing':
         env = gym.make('Boxing-v4')
-    elif game == 'asterix':
-        env = gym.make('Asterix-v4')
     elif game == 'alien':
         env = gym.make('Alien-v4')
-    elif game == 'adventure':
-        env = gym.make('Adventure-v4')
     elif game == 'breakout':
         env = gym.make('Breakout-v4')
     else:
@@ -24,7 +20,7 @@ def experiment(variant):
     
     env.reset()
     
-    state_dim = env.observation_space.shape[0] # state dimension
+    state_dim = env.observation_space.shape # state dimension
     act_dim = env.action_space.n # action dimension
 
     for i in range(1000):
@@ -43,17 +39,17 @@ def experiment(variant):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--game', type=str, default='boxing', help='Available games: boxing, asterix, alien, adventure, breakout')
+    parser.add_argument('--game', type=str, default='boxing', help='Available games: boxing, alien, breakout')
     parser.add_argument('--dataset', type=str, default='mixed', help='Dataset types: mixed, medium, expert') 
-    parser.add_argument('--mode', type=str, default='normal')  # normal for standard setting, delayed for sparse
+    parser.add_argument('--mode', type=str, default='normal', help = 'normal for standard setting, delayed for sparse')
     parser.add_argument('--K', type=int, default=20)
     parser.add_argument('--pct_traj', type=float, default=1.)
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--model_type', type=str, default='decision_transformer', help='model options: decision_transformer, trajectory_transformer, conservative_q_learning') 
+    parser.add_argument('--model_type', type=str, default='decision_transformer', help='Model options: decision_transformer, trajectory_transformer, conservative_q_learning') 
     parser.add_argument('--embed_dim', type=int, default=128)
     parser.add_argument('--n_layer', type=int, default=3)
     parser.add_argument('--n_head', type=int, default=1)
-    parser.add_argument('--activation_function', type=str, default='relu')
+    parser.add_argument('--activation_function', type=str, default='gelu')
     parser.add_argument('--dropout', type=float, default=0.1)
     parser.add_argument('--learnnig_rate', '-lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', '-wd', type=float, default=1e-4)

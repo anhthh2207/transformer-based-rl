@@ -1,3 +1,7 @@
+"""
+This script downloads the Atari D4RL datasets, preprocesses, and saves them as pickle files.
+"""
+
 import gym
 import numpy as np
 
@@ -9,12 +13,12 @@ import d4rl_atari
 
 datasets = []
 
-# for env_name in ['boxing', 'asterix', 'alien', 'adventure', 'breakout']:
-for env_name in ['boxing']:
-	# for dataset_type in ['mixed', 'medium', 'expert']:
-	for dataset_type in ['mixed']:
+# Loop over all available datasets
+for env_name in ['boxing', 'alien', 'breakout']:
+	for dataset_type in ['mixed', 'medium', 'expert']:
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name)
+		# get the D4RL dataset
 		dataset = env.get_dataset()
 
 		N = dataset['rewards'].shape[0]
@@ -26,12 +30,18 @@ for env_name in ['boxing']:
 
 		episode_step = 0
 		paths = []
+
+		# Loop over all samples in the dataset
 		for i in range(N):
+			# done_bool determines whether the episode is done
 			done_bool = bool(dataset['terminals'][i])
 			if use_timeouts:
+				# final_timestep determines whether the episode is done due to timeout
 				final_timestep = dataset['timeouts'][i]
 			else:
 				final_timestep = (episode_step == 1000-1)
+			
+			# Construct the data for the current episode
 			for k in ['observations', 'next_observations', 'actions', 'rewards', 'terminals']:
 				if k == 'next_observations':
 					try:
@@ -40,6 +50,8 @@ for env_name in ['boxing']:
 						data_[k].append(dataset['observations'][i])
 				else:
 					data_[k].append(dataset[k][i])
+
+			# If the episode is done, add the episode data to the list of episodes
 			if done_bool or final_timestep:
 				episode_step = 0
 				episode_data = {}
