@@ -3,7 +3,7 @@ import pickle
 import random
 import numpy as np
 
-class GPTConfig:
+class GPTTrainConfig:
 
     max_eval_ep_len = 1000      # max len of one evaluation episode
     num_eval_ep = 10            # num of evaluation episodes per iteration
@@ -17,15 +17,15 @@ class GPTConfig:
     max_train_iters = 20
     num_updates_per_iter = 10
 
-    context_len = 4         # K in decision transformer
-    n_blocks = 2            # num of transformer blocks
-    embed_dim = 64          # embedding (hidden) dim of transformer
-    n_heads = 1             # num of transformer heads
-    dropout_p = 0.1         # dropout probability
-
-    def __init__(self, state_dim, act_dim):
-        self.state_dim = state_dim
-        self.act_dim = act_dim
+class GPTConfig:
+    def __init__(self, state_dim, act_dim, context_len=4, n_blocks=2, embed_dim=64, n_heads=1, dropout_p=0.1):
+        self.state_dim = state_dim          # state dim
+        self.act_dim = act_dim              # action dim
+        self.context_len = context_len      # context length
+        self.n_blocks = n_blocks            # num of transformer blocks
+        self.embed_dim = embed_dim          # embedding (hidden) dim of transformer
+        self.n_heads = n_heads              # num of transformer heads
+        self.dropout_p = dropout_p          # dropout probability
 
 def discount_cumsum(x, gamma):
     disc_cumsum = np.zeros_like(x)

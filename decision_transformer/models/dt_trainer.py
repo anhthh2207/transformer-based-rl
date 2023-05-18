@@ -1,12 +1,14 @@
 from datetime import datetime
 import csv
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import gym
 import os
-from utils import D4RLTrajectoryDataset, GPTConfig
-from decision_transformer import DecisionTransformer
+from utils import D4RLTrajectoryDataset, GPTConfig, GPTTrainConfig
+from dt_model import DecisionTransformer
 
 # --------------------------------
 # Configuration
@@ -70,11 +72,12 @@ state_dim = env.observation_space.shape
 act_dim = env.action_space.n
 
 conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
+train_conf = GPTTrainConfig()
 
 traj_dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len, rtg_scale)
 
 traj_data_loader = DataLoader(traj_dataset,
-						batch_size=conf.batch_size,
+						batch_size=train_conf.batch_size,
 						shuffle=True,
 						pin_memory=True,
 						drop_last=True) 
@@ -89,23 +92,23 @@ model = DecisionTransformer(conf).to(device)
 optimizer = torch.optim.AdamW(
 					model.parameters(), 
 					lr=lr, 
-					weight_decay=conf.wt_decay
+					weight_decay=train_conf.wt_decay
 				)
 
 scheduler = torch.optim.lr_scheduler.LambdaLR(
 		optimizer,
-		lambda steps: min((steps+1)/conf.warmup_steps, 1)
+		lambda steps: min((steps+1)/train_conf.warmup_steps, 1)
 	)
 
 max_d4rl_score = -1.0
 total_updates = 0
 
-for i_train_iter in range(conf.max_train_iters):
+for i_train_iter in range(train_conf.max_train_iters):
 
 	log_action_losses = []	
 	model.train()
  
-	for _ in range(conf.num_updates_per_iter):
+	for _ in range(train_conf.num_updates_per_iter):
 		try:
 			timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
 		except StopIteration:
@@ -145,7 +148,7 @@ for i_train_iter in range(conf.max_train_iters):
 	mean_action_loss = np.mean(log_action_losses)
 	time_elapsed = str(datetime.now().replace(microsecond=0) - start_time)
 
-	total_updates += conf.num_updates_per_iter
+	total_updates += train_conf.num_updates_per_iter
 
 	log_str = ("=" * 60 + '\n' +
 			"time elapsed: " + time_elapsed  + '\n' +
