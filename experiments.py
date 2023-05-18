@@ -6,17 +6,25 @@ import numpy as np
 from decision_transformer.models.dt_model import DecisionTransformer
 from decision_transformer.models.utils import GPTConfig
 
-def get_trajectory(trajectory, observation, action, reward, target_return=1):
+def get_trajectory(trajectory, observation, action, reward):
     """ Collect observed trajectory from the environment.
     """
 
     trajectory['observations'].append(observation)
     trajectory['actions'].append(action)
-    trajectory['returns_to_go'].append(target_return - reward)
+    trajectory['rewards'].append(reward)
 
     return trajectory
 
-def make_action(trajectory, model, epsilon, context_len, device):
+def get_returns(rewards, model='dt', target_return = 1):
+    """ Calculate the returns to go.
+    """
+
+    if model == 'dt':
+        returns_to_go = [target_return - reward for reward in rewards]
+        return returns_to_go
+
+def make_action(trajectory, model, epsilon, context_len, device, model_type):
     """ Given a state, return an action sampled from the model.
     """
 
@@ -26,7 +34,8 @@ def make_action(trajectory, model, epsilon, context_len, device):
         if len(trajectory['observations']) >= context_len:  
             states = trajectory['observations'][-context_len:]
             actions = trajectory['actions'][-context_len:]
-            returns_to_go = trajectory['returns_to_go'][-context_len:]
+            rewards = trajectory['rewards'][-context_len:]
+            returns_to_go = get_returns(rewards, model=model_type)
             timesteps = np.arange(len(states))
 
             states = torch.FloatTensor(states).to(device)
@@ -44,8 +53,9 @@ def make_action(trajectory, model, epsilon, context_len, device):
             actions = trajectory['actions']
             actions = np.concatenate([np.zeros((context_len - length, *actions.shape[1:])), actions], axis=0)
             
-            returns_to_go = trajectory['returns_to_go']
-            returns_to_go = np.concatenate([np.zeros((context_len - length, *returns_to_go.shape[1:])), returns_to_go], axis=0)
+            rewards = trajectory['rewards']
+            rewards = np.concatenate([np.zeros((context_len - length, *rewards.shape[1:])), rewards], axis=0)
+            returns_to_go = get_returns(rewards, model=model_type)
 
             timesteps = np.arange(context_len)
 
@@ -92,10 +102,10 @@ def experiment(variant, device):
     max_play = 1000 # maximum number of play steps
     epsilon = 0.05 # epsilon-greedy parameter
 
-    trajectory = {'observations': [], 'actions': [], 'returns_to_go': []}
+    trajectory = {'observations': [], 'actions': [], 'rewards': []}
 
     for i in range(max_play):
-        action = make_action(trajectory, model, epsilon, device)
+        action = make_action(trajectory, model, epsilon, device, model_type)
         observation, reward, terminated, info = env.step(action)
         trajectory = get_trajectory(trajectory, observation, action, reward)
 
