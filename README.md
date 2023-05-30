@@ -4,7 +4,11 @@ Final Project COMP2050 - VinUniversity
 
 **Team**: Tran Quoc Bao, Tran Huy Hoang Anh, Le Chi Cuong
 
-**Description**: We reimplement three SOTA reinforcement learning models including Decision Transformer, Trajectory Transformer, and Conservative Q-Learning. Then, they are tested on different games on the Atari Gym environment to compare the performance.
+**Description**: 
+
+- Goal 1: analyze the SOTA transformer-based reinforcement learning models including Decision Transformer and Trajectory Transformer. Another traditional method which is Conservative Q-Learning will also be implemented to compare the performance with the others. The environment used for evaluation is the Atari Gym environment.
+
+- Goal 2: try to combine the use of transformer-based language models in RL problems with a traditional method to solve RL problem which is the actor-critic approach. The combination is born with the hope to increase the stability of the Decision Transformer model.
 
 ## How to run
 

@@ -10,7 +10,7 @@ def get_trajectory(trajectory, observation, action, reward):
     """ Collect observed trajectory from the environment.
     """
 
-    trajectory['observations'].append(observation)
+    trajectory['observations'].append(observation.flatten())
     trajectory['actions'].append(action)
     trajectory['rewards'].append(reward)
 
@@ -71,9 +71,8 @@ def experiment(variant, device):
     """ Run an experiment with the given arguments.
     """
 
-    game, dataset = variant['game'], variant['dataset']
+    game = variant['game']
     model_type = variant['model_type']
-    device = variant['model_type']
 
     # Initiate the environment
     if game == 'boxing':
@@ -87,17 +86,20 @@ def experiment(variant, device):
     
     env.reset()
     
-    state_dim = env.observation_space.shape # state dimension
+    state_dim = env.observation_space.shape[0] + env.observation_space.shape[1] + env.observation_space.shape[2] # state dimension
     act_dim = env.action_space.n # action dimension
 
     if model_type == 'decision_transformer':
+        path_to_model = "decision_transformer/models/dt_breakout-expert-v2_model.pt"
         conf = GPTConfig(state_dim=state_dim, 
                          act_dim=act_dim, 
                          context_len=variant['K'],
                          embed_dim=variant['embed_dim'],
                          n_blocks=variant['n_layer'],
                          n_heads=variant['n_head'])
-        model = DecisionTransformer(conf).to(device)
+        model = DecisionTransformer(conf)
+        # Load the trained weights
+        model.load_state_dict(torch.load(path_to_model)).to(device)
 
     max_play = 1000 # maximum number of play steps
     epsilon = 0.05 # epsilon-greedy parameter
@@ -143,7 +145,6 @@ if __name__ == '__main__':
     # parser.add_argument('--log_to_wandb', '-w', type=bool, default=False)
     
     args = parser.parse_args()
-    
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     experiment(variant=vars(args), device=device)

@@ -26,14 +26,13 @@ class MaskedCausalAttention(nn.Module):
         ones = torch.ones((max_T, max_T))
         mask = torch.tril(ones).view(1, 1, max_T, max_T) # mask for masked attention
 
-        # register buffer makes sure mask does not get updated
-        # during backpropagation
+        # register buffer makes sure mask does not get updated during back-propagation
         self.register_buffer('mask',mask)
 
     def forward(self, x):
         B, T, C = x.shape # batch size, seq length, h_dim * n_heads
 
-        N, D = self.n_heads, C // self.n_heads # N = num heads, D = attention dim
+        N, D = self.n_heads, C // self.n_heads # N = num heads, D = attention hidden dim
 
         # rearrange q, k, v as (B, N, T, D)
         q = self.q_net(x).view(B, T, N, D).transpose(1,2)

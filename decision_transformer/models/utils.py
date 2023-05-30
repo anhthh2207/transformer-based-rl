@@ -2,6 +2,7 @@ import torch
 import pickle
 import random
 import numpy as np
+from torch.utils.data import Dataset
 
 class GPTTrainConfig:
 
@@ -35,6 +36,9 @@ def discount_cumsum(x, gamma):
     return disc_cumsum
 
 class D4RLTrajectoryDataset(Dataset):
+    """ Dataset class to get trajectories from D4RL dataset
+    """
+
     def __init__(self, dataset_path, context_len, rtg_scale):
 
         self.context_len = context_len        
@@ -45,12 +49,12 @@ class D4RLTrajectoryDataset(Dataset):
         
         # calculate min len of traj, state mean and variance
         # and returns_to_go for all traj
-        min_len = 10**6
+        min_len = 10**7
         states = []
         for traj in self.trajectories:
-            traj_len = traj['observations'].shape[0]
+            traj_len = traj['observations'].flatten().shape[0]
             min_len = min(min_len, traj_len)
-            states.append(traj['observations'])
+            states.append(traj['observations'].flatten())
             # calculate returns to go and rescale them
             traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0) / rtg_scale
 
@@ -61,7 +65,6 @@ class D4RLTrajectoryDataset(Dataset):
         # normalize states
         for traj in self.trajectories:
             traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
-
 
     def get_state_stats(self):
         return self.state_mean, self.state_std

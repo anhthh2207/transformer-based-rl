@@ -42,7 +42,7 @@ start_time_str = start_time.strftime("%y-%m-%d-%H-%M-%S")
 
 prefix = "dt_" + env_d4rl_name
 
-save_model_name =  prefix + "_model_" + start_time_str + ".pt"
+save_model_name =  prefix + "_model" + ".pt"
 save_model_path = os.path.join(log_dir, save_model_name)
 save_best_model_path = save_model_path[:-3] + "_best.pt"
 
@@ -68,7 +68,7 @@ print("log csv save path: " + log_csv_path)
 
 env = gym.make(env_name)
 
-state_dim = env.observation_space.shape
+state_dim = env.observation_space.shape[0] + env.observation_space.shape[1] + env.observation_space.shape[2]
 act_dim = env.action_space.n
 
 conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
@@ -88,10 +88,10 @@ data_iter = iter(traj_data_loader)
 # state_mean, state_std = traj_dataset.get_state_stats()
 
 model = DecisionTransformer(conf).to(device)
-  
+
 optimizer = torch.optim.AdamW(
 					model.parameters(), 
-					lr=lr, 
+					lr=train_conf.lr, 
 					weight_decay=train_conf.wt_decay
 				)
 
@@ -163,12 +163,6 @@ for i_train_iter in range(train_conf.max_train_iters):
 	csv_writer.writerow(log_data)
 	
 	# save model
-	# print("max d4rl score: " + format(max_d4rl_score, ".5f"))
-	# if eval_d4rl_score >= max_d4rl_score:
-	# 	print("saving max d4rl score model at: " + save_best_model_path)
-	# 	torch.save(model.state_dict(), save_best_model_path)
-	# 	max_d4rl_score = eval_d4rl_score
-
 	print("saving current model at: " + save_model_path)
 	torch.save(model.state_dict(), save_model_path)
 
