@@ -24,7 +24,7 @@ rtg_target = 5000
 env_d4rl_name = f'breakout-{dataset}-v2'
 
 # load data from this file
-dataset_path = f'data/{env_d4rl_name}.pkl'
+dataset_path = f'../../data/{env_d4rl_name}.pkl'
 
 # saves model and csv in this directory
 log_dir = "./dt_runs/"
@@ -68,7 +68,7 @@ print("log csv save path: " + log_csv_path)
 
 env = gym.make(env_name)
 
-state_dim = env.observation_space.shape[0] + env.observation_space.shape[1] + env.observation_space.shape[2]
+state_dim = env.observation_space.shape[0] * env.observation_space.shape[1] * env.observation_space.shape[2]
 act_dim = env.action_space.n
 
 conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
@@ -87,7 +87,13 @@ data_iter = iter(traj_data_loader)
 ## get state stats from dataset
 # state_mean, state_std = traj_dataset.get_state_stats()
 
-model = DecisionTransformer(conf).to(device)
+model = DecisionTransformer(state_dim=conf.state_dim,
+							act_dim=conf.act_dim,
+							n_blocks=conf.n_blocks,
+							h_dim=conf.embed_dim,
+							context_len=conf.context_len,
+							n_heads=conf.n_heads,
+							drop_p=conf.dropout_p).to(device)
 
 optimizer = torch.optim.AdamW(
 					model.parameters(), 
@@ -107,7 +113,7 @@ for i_train_iter in range(train_conf.max_train_iters):
 
 	log_action_losses = []	
 	model.train()
- 
+
 	for _ in range(train_conf.num_updates_per_iter):
 		try:
 			timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)

@@ -52,7 +52,7 @@ class D4RLTrajectoryDataset(Dataset):
         min_len = 10**7
         states = []
         for traj in self.trajectories:
-            traj_len = traj['observations'].flatten().shape[0]
+            traj_len = traj['observations'].shape[0]
             min_len = min(min_len, traj_len)
             states.append(traj['observations'].flatten())
             # calculate returns to go and rescale them
