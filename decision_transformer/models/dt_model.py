@@ -117,12 +117,12 @@ class DecisionTransformer(nn.Module):
         T = timesteps.shape[1] # seq length
 
         time_embeddings = self.embed_timestep(timesteps).reshape(B, T, self.h_dim)
-        # print(states.shape, actions.shape, returns_to_go.shape, timesteps.shape, time_embeddings.shape)
+
         # time embeddings are treated similar to positional embeddings
         state_embeddings = self.embed_state(states).reshape(B, T, self.h_dim) + time_embeddings
         action_embeddings = self.embed_action(actions).reshape(B, T, self.h_dim) + time_embeddings
         returns_embeddings = self.embed_rtg(returns_to_go).reshape(B, T, self.h_dim) + time_embeddings
-        # print(state_embeddings.shape, action_embeddings.shape, returns_embeddings.shape)
+
         # stack rtg, states and actions and reshape sequence as
         # (r1, s1, a1, r2, s2, a2 ...)
         h = torch.stack(

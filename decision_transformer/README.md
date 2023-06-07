@@ -1,11 +1,5 @@
 General info:
 
-Input to each transformer block of size (B,T,C):
-
-- B: batch size
-- T: input sequence length (later be equal to 3*h_dim)
-- C: vector state (state_dim) + action (action_dim = 4)
-
 Input to the model: 
 
 - timesteps: matrix of size (B,T)

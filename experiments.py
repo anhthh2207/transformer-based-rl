@@ -36,10 +36,7 @@ def make_action(trajectory, model, epsilon, context_len, device, model_type='dec
         action = np.random.randint(0, model.act_dim)
     else:
         state_dim = trajectory['observations'][0].shape[0]
-        # states = torch.zeros((context_len,state_dim)).reshape(1,context_len,-1)
         states = torch.zeros((context_len, state_dim))
-        # actions = torch.zeros((1,context_len,1))
-        # returns_to_go = torch.zeros((1,context_len,1))
         actions = np.zeros(context_len)
         returns_to_go = np.zeros(context_len)
 
@@ -49,10 +46,6 @@ def make_action(trajectory, model, epsilon, context_len, device, model_type='dec
             for i in range(context_len):
                 state = trajectory['observations'][-i]
                 states[context_len-i-1] = torch.from_numpy(state)
-                # action = np.array([trajectory['actions'][-i]])
-                # actions[0,context_len-i-1] = torch.from_numpy(action)
-                # return_to_go = np.array(rtg[-i])
-                # returns_to_go[0,context_len-i-1] = torch.from_numpy(return_to_go)
                 action = trajectory['actions'][-i]
                 actions[context_len-i-1] = action
                 return_to_go = rtg[-i]
@@ -64,10 +57,6 @@ def make_action(trajectory, model, epsilon, context_len, device, model_type='dec
             for i in range(len(trajectory['observations'])):
                 state = trajectory['observations'][-i]
                 states[context_len-i-1] = torch.from_numpy(state)
-                # action = trajectory['actions'][-i]
-                # actions[0,context_len-i-1] = torch.from_numpy(action)
-                # return_to_go = rtg[-i]
-                # returns_to_go[0,context_len-i-1] = torch.from_numpy(return_to_go)
                 action = trajectory['actions'][-i]
                 actions[context_len-i-1] = action
                 return_to_go = rtg[-i]
