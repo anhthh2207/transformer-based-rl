@@ -68,7 +68,7 @@ def make_action(trajectory, model, epsilon, context_len, device, model_type='dec
         timesteps = np.arange(context_len)
         timesteps = torch.LongTensor(timesteps).reshape(1,context_len).to(device)
         _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
-        action = action_preds[0,-1].argmax().detach().numpy()
+        action = action_preds[0,-1].argmax().detach().cpu().numpy() # move tensor to cpu() before convert to numpy arrray
     return action
 
 def experiment(variant, device):
@@ -104,6 +104,10 @@ def experiment(variant, device):
                                     context_len=conf.context_len,
                                     n_heads=conf.n_heads,
                                     drop_p=conf.dropout_p)
+
+        # move model to device
+        model = model.to(device)
+
         # Load the trained weights
         # model.load_state_dict(torch.load(path_to_model)).to(device)
         model.eval()
