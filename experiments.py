@@ -25,7 +25,7 @@ def get_trajectory(trajectory, observation, action, reward):
 
     return trajectory
 
-def get_returns(rewards, model='decision_transformer', target_return = 1, rtg_scale = 1000):
+def get_returns(rewards, model='decision_transformer', target_return = 1, rtg_scale = 1):
     """ Calculate the returns to go.
     """
 
@@ -123,8 +123,9 @@ def experiment(variant, device):
         if terminated:
             env.reset()
 
-        if (i+1) % 100 == 0:
+        if (i+1) % 10000 == 0:
             print(reward)
+            print(trajectory['rewards'])
 
     env.close()
 
