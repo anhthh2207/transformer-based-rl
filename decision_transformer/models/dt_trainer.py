@@ -43,10 +43,8 @@ print("model save path: " + save_model_path)
 env = gym.make(env_name)
 env.observation_space.shape = (84, 84)  # resized gray-scale image
 
-state_dim = env.observation_space.shape[0]
-act_dim = env.action_space.n
-# state_dim = 84
-# act_dim = 4
+state_dim = env.observation_space.shape[0] # 84
+act_dim = env.action_space.n # 4
 
 # --------------------------------
 # Training
@@ -87,7 +85,7 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(
     lambda steps: min((steps+1)/train_conf.warmup_steps, 1)
 )
 
-max_d4rl_score = -1.0
+# max_d4rl_score = -1.0
 total_updates = 0
 
 for i_train_iter in range(train_conf.max_train_iters):
@@ -134,7 +132,6 @@ for i_train_iter in range(train_conf.max_train_iters):
 
         log_action_losses.append(action_loss.detach().cpu().item())
 
-
     mean_action_loss = np.mean(log_action_losses)
 
     total_updates += train_conf.num_updates_per_iter
@@ -144,15 +141,10 @@ for i_train_iter in range(train_conf.max_train_iters):
             "action loss: " +  format(mean_action_loss, ".5f")
             )
     print(log_str)
-
-    # save model
-    print("saving current model at: " + save_model_path)
     torch.save(model.state_dict(), save_model_path)
 
 
 print("=" * 60)
 print("finished training!")
-print("max d4rl score: " + format(max_d4rl_score, ".5f"))
-print("saved max d4rl score model at: " + save_best_model_path)
-print("saved last updated model at: " + save_model_path)
+print("saved model at: " + save_model_path)
 print("=" * 60)
