@@ -137,7 +137,6 @@ for epoch in range(train_conf.max_epochs):
 # save model
 torch.save(model.state_dict(), save_model_path)
 
-
 print("=" * 60)
 print("finished training!")
 print("saved model at: " + save_model_path)
