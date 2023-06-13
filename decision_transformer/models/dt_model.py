@@ -89,12 +89,16 @@ class DecisionTransformer(nn.Module):
         self.h_dim = h_dim
 
         ### projection heads (project to embedding)
-        self.embed_timestep = nn.Embedding(max_timestep, h_dim)
-        self.embed_rtg = nn.Linear(1*context_len, h_dim*context_len) # reward-to-go
-        self.embed_state = nn.Linear(state_dim*context_len, h_dim*context_len)
-
-        # discrete actions
-        self.embed_action = nn.Embedding(act_dim, h_dim)
+        self.embed_timestep = nn.Sequential(nn.Embedding(max_timestep, h_dim), nn.Tanh())
+        self.embed_rtg = nn.Sequential(nn.Linear(1*context_len, h_dim*context_len), nn.Tanh())
+        
+        # self.embed_state = nn.Linear(state_dim*context_len, h_dim*context_len)
+        self.embed_state = nn.Sequential(nn.Conv2d(context_len, 32, 8, stride=4, padding=0), nn.ReLU(),
+                                 nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
+                                 nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU(),
+                                 nn.Flatten(), nn.Linear(3136, h_dim*context_len), nn.Tanh())
+        
+        self.embed_action = nn.Sequential(nn.Embedding(act_dim, h_dim), nn.Tanh())
         use_action_tanh = False # False for discrete actions
 
         self.embed_ln = nn.LayerNorm(h_dim)
@@ -113,15 +117,15 @@ class DecisionTransformer(nn.Module):
 
     def forward(self, timesteps, states, actions, returns_to_go):
 
-        B = states.shape[0] # batch size, seq length * state_dim
-        T = timesteps.shape[1] # seq length
+        B = states.shape[0] # batch size, context length, state_dim, state_dim
+        T = timesteps.shape[1] # context length
 
-        time_embeddings = self.embed_timestep(timesteps).reshape(B, T, self.h_dim)
+        time_embeddings = self.embed_timestep(timesteps.type(torch.long)).reshape(B, T, self.h_dim)
 
         # time embeddings are treated similar to positional embeddings
-        state_embeddings = self.embed_state(states).reshape(B, T, self.h_dim) + time_embeddings
-        action_embeddings = self.embed_action(actions).reshape(B, T, self.h_dim) + time_embeddings
-        returns_embeddings = self.embed_rtg(returns_to_go).reshape(B, T, self.h_dim) + time_embeddings
+        state_embeddings = self.embed_state(states.type(torch.float32)).reshape(B, T, self.h_dim) + time_embeddings
+        action_embeddings = self.embed_action(actions.type(torch.long)).reshape(B, T, self.h_dim) + time_embeddings
+        returns_embeddings = self.embed_rtg(returns_to_go.type(torch.float32)).reshape(B, T, self.h_dim) + time_embeddings
 
         # stack rtg, states and actions and reshape sequence as
         # (r1, s1, a1, r2, s2, a2 ...)

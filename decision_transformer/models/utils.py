@@ -3,6 +3,15 @@ import pickle
 import random
 import numpy as np
 from torch.utils.data import Dataset
+from skimage.color import rgb2gray
+from skimage.transform import resize
+
+# 210*160*3(color) --> 84*84(mono)
+# float --> integer (to reduce the size of replay memory)
+def pre_processing(observe):
+    processed_observe = np.uint8(
+        resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
+    return processed_observe
 
 class GPTTrainConfig:
 

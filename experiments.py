@@ -4,17 +4,15 @@ import torch
 import numpy as np
 
 from decision_transformer.models.dt_model import DecisionTransformer
-from decision_transformer.models.utils import GPTConfig
+from decision_transformer.models.utils import GPTConfig, pre_processing
 
 def get_trajectory(trajectory, observation, action, reward):
     """ Collect observed trajectory from the environment.
     """
 
-    trajectory['observations'].append(observation.flatten())
+    trajectory['observations'].append(observation)
     trajectory['actions'].append(action)
     trajectory['rewards'].append(reward)
-
-    print(len(trajectory['observations']), type(trajectory['observations'][-1]))
 
     return trajectory
 
@@ -26,43 +24,29 @@ def get_returns(rewards, model='decision_transformer', target_return = 1, rtg_sc
         returns_to_go = [target_return - reward/rtg_scale for reward in rewards]
         return returns_to_go
 
-def make_action(trajectory, model, epsilon, context_len, device, model_type='decision_transformer'):
+def make_action(trajectory, model, context_len, device, model_type='decision_transformer'):
     """ Given a state, return an action sampled from the model.
     """
 
-    if epsilon > 0. and np.random.rand() < epsilon:
-        action = np.random.randint(0, model.act_dim)
-    elif len(trajectory['observations']) == 0:
+    if len(trajectory['observations']) == 0:
         action = np.random.randint(0, model.act_dim)
     else:
         state_dim = trajectory['observations'][0].shape[0]
-        states = torch.zeros((context_len, state_dim))
+        states = torch.zeros((context_len, state_dim, state_dim))
         actions = np.zeros(context_len)
         returns_to_go = np.zeros(context_len)
 
-        if len(trajectory['observations']) >= context_len:
-            rewards = trajectory['rewards'][-context_len:]
-            rtg = get_returns(rewards, model=model_type)
-            for i in range(context_len):
-                state = trajectory['observations'][-i]
-                states[context_len-i-1] = torch.from_numpy(state)
-                action = trajectory['actions'][-i]
-                actions[context_len-i-1] = action
-                return_to_go = rtg[-i]
-                returns_to_go[context_len-i-1] = return_to_go
-        else:
-            # else, padding the states, actions, returns_to_go, timesteps with zeros
-            rewards = trajectory['rewards']
-            rtg = get_returns(rewards, model=model_type)
-            for i in range(len(trajectory['observations'])):
-                state = trajectory['observations'][-i]
-                states[context_len-i-1] = torch.from_numpy(state)
-                action = trajectory['actions'][-i]
-                actions[context_len-i-1] = action
-                return_to_go = rtg[-i]
-                returns_to_go[context_len-i-1] = return_to_go
+        rewards = trajectory['rewards']
+        rtg = get_returns(rewards, model=model_type)
+        for i in range(min(context_len, len(trajectory['observations']))):
+            state = trajectory['observations'][-i]
+            states[context_len-i-1] = torch.from_numpy(state)
+            action = trajectory['actions'][-i]
+            actions[context_len-i-1] = action
+            return_to_go = rtg[-i]
+            returns_to_go[context_len-i-1] = return_to_go
 
-        states = states.reshape(1,context_len*state_dim).to(device)
+        states = states.reshape(1,context_len,state_dim,state_dim).to(device)
         actions = torch.from_numpy(actions).long().reshape(1,context_len).to(device)
         returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len).to(device)
         timesteps = np.arange(context_len)
@@ -85,17 +69,18 @@ def experiment(variant, device):
         env = gym.make('Alien-v4')
     elif game == 'breakout':
         env = gym.make('Breakout-v4')
+        env.observation_space.shape = (84, 84)  # resized gray-scale image
     else:
         raise NotImplementedError
     
     env.reset()
     
-    state_dim = env.observation_space.shape[0] * env.observation_space.shape[1] * env.observation_space.shape[2] # state dimension
+    state_dim = env.observation_space.shape[0] # state dimension
     act_dim = env.action_space.n # action dimension
 
     if model_type == 'decision_transformer':
         # path_to_model = "decision_transformer/models/dt_runs/dt_breakout-expert-v2_model_best.pt"
-        conf = GPTConfig(state_dim=state_dim, 
+        conf = GPTConfig(state_dim=state_dim,
                          act_dim=act_dim)
         model = DecisionTransformer(state_dim=conf.state_dim,
                                     act_dim=conf.act_dim,
@@ -109,13 +94,13 @@ def experiment(variant, device):
         model.eval()
 
     max_play = 1000 # maximum number of play steps
-    epsilon = 0.05 # epsilon-greedy parameter
 
     trajectory = {'observations': [], 'actions': [], 'rewards': []}
 
     for i in range(max_play):
-        action = make_action(trajectory, model, epsilon, conf.context_len, device, model_type)
+        action = make_action(trajectory, model, conf.context_len, device, model_type)
         observation, reward, terminated, info = env.step(action)
+        observation = pre_processing(observation)
         trajectory = get_trajectory(trajectory, observation, action, reward)
 
         env.render()
