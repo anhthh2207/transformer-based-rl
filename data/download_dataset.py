@@ -16,6 +16,8 @@ datasets = []
 # Loop over all available datasets
 for env_name in ['boxing', 'alien', 'breakout']:
 	for dataset_type in ['mixed', 'medium', 'expert']:
+# for env_name in ['breakout']:
+# 	for dataset_type in ['expert']:
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name)
 		# get the D4RL dataset

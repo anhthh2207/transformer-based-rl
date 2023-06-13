@@ -3,23 +3,32 @@ import pickle
 import random
 import numpy as np
 from torch.utils.data import Dataset
+from skimage.color import rgb2gray
+from skimage.transform import resize
+
+# 210*160*3(color) --> 84*84(mono)
+# float --> integer (to reduce the size of replay memory)
+def pre_processing(observe):
+    processed_observe = np.uint8(
+        resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
+    return processed_observe
 
 class GPTTrainConfig:
 
     max_eval_ep_len = 1000      # max len of one evaluation episode
     num_eval_ep = 10            # num of evaluation episodes per iteration
 
-    batch_size = 64             # training batch size
-    lr = 1e-4                   # learning rate
-    wt_decay = 1e-4             # weight decay
-    warmup_steps = 10000        # warmup steps for lr scheduler
+    batch_size = 128            # training batch size
+    lr = 6e-4                   # learning rate
+    wt_decay = 0.1              # weight decay
+    warmup_steps = 512*20       # warmup steps for lr scheduler
 
     # total updates = max_train_iters x num_updates_per_iter
     max_train_iters = 20
     num_updates_per_iter = 10
 
 class GPTConfig:
-    def __init__(self, state_dim, act_dim, context_len=4, n_blocks=2, embed_dim=64, n_heads=1, dropout_p=0.1):
+    def __init__(self, state_dim, act_dim, context_len=30, n_blocks=6, embed_dim=128, n_heads=8, dropout_p=0.1):
         self.state_dim = state_dim          # state dim
         self.act_dim = act_dim              # action dim
         self.context_len = context_len      # context length
@@ -29,6 +38,8 @@ class GPTConfig:
         self.dropout_p = dropout_p          # dropout probability
 
 def discount_cumsum(x, gamma):
+    """ This function computes the ground truth discounted reward at each timestep
+    """
     disc_cumsum = np.zeros_like(x)
     disc_cumsum[-1] = x[-1]
     for t in reversed(range(x.shape[0]-1)):
@@ -39,7 +50,7 @@ class D4RLTrajectoryDataset(Dataset):
     """ Dataset class to get trajectories from D4RL dataset
     """
 
-    def __init__(self, dataset_path, context_len, rtg_scale):
+    def __init__(self, dataset_path, context_len):
 
         self.context_len = context_len        
 
@@ -56,18 +67,16 @@ class D4RLTrajectoryDataset(Dataset):
             min_len = min(min_len, traj_len)
             states.append(traj['observations'].flatten())
             # calculate returns to go and rescale them
-            traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0) / rtg_scale
+            traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0)
 
         # used for input normalization
-        states = np.concatenate(states, axis=0)
-        self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+        # states = np.concatenate(states, axis=0)
+        # self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
 
         # normalize states
         for traj in self.trajectories:
-            traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
-
-    def get_state_stats(self):
-        return self.state_mean, self.state_std
+            # traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
+            traj['observations'] = traj['observations'] / 255.
 
     def __len__(self):
         return len(self.trajectories)
@@ -93,22 +102,16 @@ class D4RLTrajectoryDataset(Dataset):
 
             # padding with zeros
             states = torch.from_numpy(traj['observations'])
-            states = torch.cat([states,
-                                torch.zeros(([padding_len] + list(states.shape[1:])),
-                                dtype=states.dtype)], 
-                               dim=0)
+            states = torch.cat([states, torch.zeros(([padding_len] + list(states.shape[1:])), dtype=states.dtype)], 
+                                dim=0)
             
             actions = torch.from_numpy(traj['actions'])
-            actions = torch.cat([actions,
-                                torch.zeros(([padding_len] + list(actions.shape[1:])),
-                                dtype=actions.dtype)], 
+            actions = torch.cat([actions, torch.zeros(([padding_len] + list(actions.shape[1:])), dtype=actions.dtype)], 
                                dim=0)
 
             returns_to_go = torch.from_numpy(traj['returns_to_go'])
-            returns_to_go = torch.cat([returns_to_go,
-                                torch.zeros(([padding_len] + list(returns_to_go.shape[1:])),
-                                dtype=returns_to_go.dtype)], 
-                               dim=0)
+            returns_to_go = torch.cat([returns_to_go, torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype)], 
+                                        dim=0)
             
             timesteps = torch.arange(start=0, end=self.context_len, step=1)
 
@@ -116,4 +119,4 @@ class D4RLTrajectoryDataset(Dataset):
                                    torch.zeros(padding_len, dtype=torch.long)], 
                                   dim=0)
             
-        return  timesteps, states, actions, returns_to_go, traj_mask
+        return  timesteps, states.squeeze(), actions, returns_to_go, traj_mask
