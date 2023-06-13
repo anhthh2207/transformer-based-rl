@@ -16,10 +16,8 @@ from dt_model import DecisionTransformer
 device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
 dataset = "expert"
-rtg_scale = 1
 
 env_name = 'Breakout-v0'
-# rtg_target = 1
 env_d4rl_name = f'breakout-{dataset}-v2'
 
 # load data from this file
@@ -57,7 +55,7 @@ act_dim = env.action_space.n
 conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
 train_conf = GPTTrainConfig()
 
-traj_dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len, rtg_scale)
+traj_dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
 
 traj_data_loader = DataLoader(traj_dataset,
 						batch_size=train_conf.batch_size,

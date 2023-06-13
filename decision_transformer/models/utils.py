@@ -50,7 +50,7 @@ class D4RLTrajectoryDataset(Dataset):
     """ Dataset class to get trajectories from D4RL dataset
     """
 
-    def __init__(self, dataset_path, context_len, rtg_scale):
+    def __init__(self, dataset_path, context_len):
 
         self.context_len = context_len        
 
@@ -67,7 +67,7 @@ class D4RLTrajectoryDataset(Dataset):
             min_len = min(min_len, traj_len)
             states.append(traj['observations'].flatten())
             # calculate returns to go and rescale them
-            traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0) / rtg_scale
+            traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0)
 
         # used for input normalization
         states = np.concatenate(states, axis=0)
