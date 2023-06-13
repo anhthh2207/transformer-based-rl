@@ -110,7 +110,7 @@ class DecisionTransformer(nn.Module):
 
         ### prediction heads
         self.predict_rtg = torch.nn.Linear(h_dim, 1)
-        self.predict_state = torch.nn.Linear(h_dim, state_dim)
+        self.predict_state = torch.nn.Linear(h_dim, state_dim*state_dim)
         self.predict_action = nn.Sequential(
             *([nn.Linear(h_dim, act_dim)] + ([nn.Tanh()] if use_action_tanh else []))
         )
@@ -146,7 +146,7 @@ class DecisionTransformer(nn.Module):
 
         # get predictions
         return_preds = self.predict_rtg(h[:,2])     # predict next rtg given r, s, a
-        state_preds = self.predict_state(h[:,2])    # predict next state given r, s, a
+        state_preds = self.predict_state(h[:,2]).reshape(self.state_dim, self.state_dim)    # predict next state given r, s, a
         action_preds = self.predict_action(h[:,1])  # predict action given r, s
     
         return state_preds, action_preds, return_preds
