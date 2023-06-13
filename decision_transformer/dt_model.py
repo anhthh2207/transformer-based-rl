@@ -146,7 +146,7 @@ class DecisionTransformer(nn.Module):
 
         # get predictions
         return_preds = self.predict_rtg(h[:,2])     # predict next rtg given r, s, a
-        state_preds = self.predict_state(h[:,2]).reshape(self.state_dim, self.state_dim)    # predict next state given r, s, a
+        state_preds = self.predict_state(h[:,2]).reshape(B, T, self.state_dim, self.state_dim)    # predict next state given r, s, a
         action_preds = self.predict_action(h[:,1])  # predict action given r, s
     
         return state_preds, action_preds, return_preds

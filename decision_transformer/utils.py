@@ -16,7 +16,7 @@ class GPTTrainConfig:
 
     # total updates = max_train_iters x num_updates_per_iter
     max_train_iters = 20
-    num_updates_per_iter = 10
+    num_updates_per_iter = 50
 
 class GPTConfig:
     def __init__(self, state_dim, act_dim, context_len=30, n_blocks=6, embed_dim=128, n_heads=8, dropout_p=0.1):

@@ -90,7 +90,7 @@ def experiment(variant, device):
     act_dim = env.action_space.n # action dimension
 
     if model_type == 'decision_transformer':
-        # path_to_model = "decision_transformer/models/dt_runs/dt_breakout-expert-v2_model_best.pt"
+        # path_to_model = "decision_transformer/models/dt_runs/dt_breakout-expert-v2_model.pt"
         conf = GPTConfig(state_dim=state_dim,
                          act_dim=act_dim)
         model = DecisionTransformer(state_dim=conf.state_dim,
