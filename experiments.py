@@ -81,7 +81,6 @@ def experiment(variant, device):
     act_dim = env.action_space.n # action dimension
 
     if model_type == 'decision_transformer':
-        # path_to_model = "decision_transformer/models/dt_runs/dt_breakout-expert-v2_model_best.pt"
         conf = GPTConfig(state_dim=state_dim,
                          act_dim=act_dim)
         model = DecisionTransformer(state_dim=conf.state_dim,
@@ -91,12 +90,14 @@ def experiment(variant, device):
                                     context_len=conf.context_len,
                                     n_heads=conf.n_heads,
                                     drop_p=conf.dropout_p)
-
         # move model to device
         model = model.to(device)
-
         # Load the trained weights
-        # model.load_state_dict(torch.load(path_to_model)).to(device)
+        path_to_model = "decision_transformer\dt_runs\dt_breakout-expert-v2_model.pt"
+        if torch.cuda.is_available():
+            model.load_state_dict(torch.load(path_to_model)).to(device)
+        else:
+            model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
 
     max_play = 1000 # maximum number of play steps
