@@ -4,7 +4,7 @@ channels:
 dependencies:
 - python=3.8.10
 - anaconda
-# - cudatoolkit=10.
+- cudatoolkit=10.
 - numpy
 # - opencv
 - pip
@@ -16,4 +16,4 @@ dependencies:
   - torch==2.0.0
   - transformers==4.29.1
   - scikit-image==0.21.0
-  # - wandb==0.9.1
+  - wandb==0.9.1

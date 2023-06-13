@@ -2,9 +2,18 @@ import gym
 import argparse
 import torch
 import numpy as np
+from skimage.color import rgb2gray
+from skimage.transform import resize
 
 from decision_transformer.dt_model import DecisionTransformer
-from decision_transformer.utils import GPTConfig, pre_processing
+from decision_transformer.utils import GPTConfig
+
+# 210*160*3(color) --> 84*84(mono)
+# float --> integer (to reduce the size of replay memory)
+def pre_processing(observe):
+    processed_observe = np.uint8(
+        resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
+    return processed_observe / 255.
 
 def get_trajectory(trajectory, observation, action, reward):
     """ Collect observed trajectory from the environment.
@@ -99,7 +108,7 @@ def experiment(variant, device):
         # model.load_state_dict(torch.load(path_to_model)).to(device)
         model.eval()
 
-    max_play = 1000 # maximum number of play steps
+    max_play = 500000 # maximum number of play steps
 
     trajectory = {'observations': [], 'actions': [], 'rewards': []}
 

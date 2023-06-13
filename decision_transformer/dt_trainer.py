@@ -93,8 +93,8 @@ for i_train_iter in range(train_conf.max_train_iters):
 
 		# reshape data before feeding to model
         timesteps = timesteps.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T
-        states = states.float().reshape(train_conf.batch_size,conf.context_len,conf.state_dim,conf.state_dim).to(device)			# B x T x state_dim
-        actions = actions.float().reshape(train_conf.batch_size,conf.context_len).to(device)		# B x T x act_dim
+        states = states.reshape(train_conf.batch_size,conf.context_len,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)			# B x T x state_dim
+        actions = actions.reshape(train_conf.batch_size,conf.context_len).to(dtype=torch.float32, device=device)		# B x T x act_dim
         returns_to_go = returns_to_go.reshape(train_conf.batch_size,conf.context_len).to(device) # B x T x 1
         traj_mask = traj_mask.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T
 

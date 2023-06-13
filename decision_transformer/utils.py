@@ -3,15 +3,6 @@ import pickle
 import random
 import numpy as np
 from torch.utils.data import Dataset
-from skimage.color import rgb2gray
-from skimage.transform import resize
-
-# 210*160*3(color) --> 84*84(mono)
-# float --> integer (to reduce the size of replay memory)
-def pre_processing(observe):
-    processed_observe = np.uint8(
-        resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
-    return processed_observe
 
 class GPTTrainConfig:
 
@@ -60,12 +51,12 @@ class D4RLTrajectoryDataset(Dataset):
         
         # calculate min len of traj, state mean and variance
         # and returns_to_go for all traj
-        min_len = 10**7
-        states = []
+        min_len = 500000
+        # states = []
         for traj in self.trajectories:
             traj_len = traj['observations'].shape[0]
             min_len = min(min_len, traj_len)
-            states.append(traj['observations'].flatten())
+            # states.append(traj['observations'])
             # calculate returns to go and rescale them
             traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0)
 
