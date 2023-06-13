@@ -65,8 +65,10 @@ def experiment(variant, device):
     # Initiate the environment
     if game == 'boxing':
         env = gym.make('Boxing-v4')
+        env.observation_space.shape = (84, 84)  # resized gray-scale image
     elif game == 'alien':
         env = gym.make('Alien-v4')
+        env.observation_space.shape = (84, 84)  # resized gray-scale image
     elif game == 'breakout':
         env = gym.make('Breakout-v4')
         env.observation_space.shape = (84, 84)  # resized gray-scale image
@@ -117,10 +119,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default='breakout', help='Available games: boxing, alien, breakout')
     parser.add_argument('--dataset', type=str, default='expert', help='Dataset types: mixed, medium, expert') 
-    # parser.add_argument('--mode', type=str, default='normal', help = 'normal for standard setting, delayed for sparse')
     parser.add_argument('--model_type', type=str, default='decision_transformer', help='Model options: decision_transformer, trajectory_transformer, conservative_q_learning') 
     
     args = parser.parse_args()
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
     experiment(variant=vars(args), device=device)

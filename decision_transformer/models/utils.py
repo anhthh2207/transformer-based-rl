@@ -70,15 +70,13 @@ class D4RLTrajectoryDataset(Dataset):
             traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0)
 
         # used for input normalization
-        states = np.concatenate(states, axis=0)
-        self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+        # states = np.concatenate(states, axis=0)
+        # self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
 
         # normalize states
         for traj in self.trajectories:
-            traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
-
-    def get_state_stats(self):
-        return self.state_mean, self.state_std
+            # traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
+            traj['observations'] = traj['observations'] / 255.
 
     def __len__(self):
         return len(self.trajectories)

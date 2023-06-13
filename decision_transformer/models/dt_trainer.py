@@ -15,22 +15,19 @@ from dt_model import DecisionTransformer
 
 device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
+# environment parameters
 dataset = "expert"
-
 env_name = 'Breakout-v0'
 env_d4rl_name = f'breakout-{dataset}-v2'
 
-# load data from this file
-dataset_path = '../../data/breakout-expert-v2.pkl'
+# dataset path
+dataset_path = '../../data/' + env_d4rl_name + '.pkl'
 
-# saves model in this directory
+# model saving directory
 log_dir = "./dt_runs/"
-
 if not os.path.exists(log_dir):
     os.makedirs(log_dir)
-    
 prefix = "dt_" + env_d4rl_name
-
 save_model_name =  prefix + "_model" + ".pt"
 save_model_path = os.path.join(log_dir, save_model_name)
 save_best_model_path = save_model_path[:-3] + "_best.pt"
@@ -41,9 +38,7 @@ print("dataset path: " + dataset_path)
 print("model save path: " + save_model_path)
 
 env = gym.make(env_name)
-env.observation_space.shape = (84, 84)  # resized gray-scale image
-
-state_dim = env.observation_space.shape[0] # 84
+state_dim = 84
 act_dim = env.action_space.n # 4
 
 # --------------------------------
@@ -62,9 +57,6 @@ traj_data_loader = DataLoader(traj_dataset,
 						drop_last=True) 
 
 data_iter = iter(traj_data_loader)
-
-## get state stats from dataset
-# state_mean, state_std = traj_dataset.get_state_stats()
 
 model = DecisionTransformer(state_dim=conf.state_dim,
 							act_dim=conf.act_dim,
@@ -85,7 +77,6 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(
     lambda steps: min((steps+1)/train_conf.warmup_steps, 1)
 )
 
-# max_d4rl_score = -1.0
 total_updates = 0
 
 for i_train_iter in range(train_conf.max_train_iters):
