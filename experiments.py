@@ -3,8 +3,8 @@ import argparse
 import torch
 import numpy as np
 
-from decision_transformer.models.dt_model import DecisionTransformer
-from decision_transformer.models.utils import GPTConfig, pre_processing
+from decision_transformer.dt_model import DecisionTransformer
+from decision_transformer.utils import GPTConfig, pre_processing
 
 def get_trajectory(trajectory, observation, action, reward):
     """ Collect observed trajectory from the environment.

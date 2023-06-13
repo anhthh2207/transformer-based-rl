@@ -21,7 +21,7 @@ env_name = 'Breakout-v0'
 env_d4rl_name = f'breakout-{dataset}-v2'
 
 # dataset path
-dataset_path = '../../data/' + env_d4rl_name + '.pkl'
+dataset_path = '../data/' + env_d4rl_name + '.pkl'
 
 # model saving directory
 log_dir = "./dt_runs/"
