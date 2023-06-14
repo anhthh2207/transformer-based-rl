@@ -14,10 +14,10 @@ import d4rl_atari
 datasets = []
 
 # Loop over all available datasets
-for env_name in ['boxing', 'alien', 'breakout']:
-	for dataset_type in ['mixed', 'medium', 'expert']:
-# for env_name in ['breakout']:
-# 	for dataset_type in ['expert']:
+# for env_name in ['boxing', 'alien', 'breakout']:
+# 	for dataset_type in ['mixed', 'medium', 'expert']:
+for env_name in ['breakout']:
+	for dataset_type in ['expert']:
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name)
 		# get the D4RL dataset
@@ -41,7 +41,7 @@ for env_name in ['boxing', 'alien', 'breakout']:
 				# final_timestep determines whether the episode is done due to timeout
 				final_timestep = dataset['timeouts'][i]
 			else:
-				final_timestep = (episode_step == 1000-1)
+				final_timestep = (episode_step == 500000-1)
 			
 			# Construct the data for the current episode
 			for k in ['observations', 'next_observations', 'actions', 'rewards', 'terminals']:

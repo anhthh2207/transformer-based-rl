@@ -54,9 +54,10 @@ traj_data_loader = DataLoader(traj_dataset,
 						batch_size=train_conf.batch_size,
 						shuffle=True,
 						pin_memory=True,
-						drop_last=True) 
+						drop_last=True,
+                        num_workers=4) 
 
-data_iter = iter(traj_data_loader)
+# data_iter = iter(traj_data_loader)
 
 model = DecisionTransformer(state_dim=conf.state_dim,
 							act_dim=conf.act_dim,
@@ -79,17 +80,18 @@ scheduler = torch.optim.lr_scheduler.LambdaLR(
 
 total_updates = 0
 
-for i_train_iter in range(train_conf.max_train_iters):
+for epoch in range(train_conf.max_epochs):
 
     log_action_losses = []
     model.train()
 
-    for _ in range(train_conf.num_updates_per_iter):
-        try:
-            timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
-        except StopIteration:
-            data_iter = iter(traj_data_loader)
-            timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
+    # for _ in range(train_conf.num_updates_per_iter):
+    for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(traj_data_loader):
+        # try:
+        #     timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
+        # except StopIteration:
+        #     data_iter = iter(traj_data_loader)
+        #     timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
 
 		# reshape data before feeding to model
         timesteps = timesteps.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T
@@ -122,17 +124,18 @@ for i_train_iter in range(train_conf.max_train_iters):
         scheduler.step()
 
         log_action_losses.append(action_loss.detach().cpu().item())
+        total_updates += 1
 
     mean_action_loss = np.mean(log_action_losses)
-
-    total_updates += train_conf.num_updates_per_iter
 
     log_str = ("=" * 60 + '\n' +
             "num of updates: " + str(total_updates) + '\n' +
             "action loss: " +  format(mean_action_loss, ".5f")
             )
     print(log_str)
-    torch.save(model.state_dict(), save_model_path)
+
+# save model
+torch.save(model.state_dict(), save_model_path)
 
 
 print("=" * 60)

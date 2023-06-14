@@ -1,6 +1,7 @@
 import gym
 import argparse
 import torch
+from torch.nn import functional as F
 import numpy as np
 from skimage.color import rgb2gray
 from skimage.transform import resize
@@ -25,7 +26,7 @@ def get_trajectory(trajectory, observation, action, reward):
 
     return trajectory
 
-def get_returns(rewards, model='decision_transformer', target_return = 1, rtg_scale = 1):
+def get_returns(rewards, model='decision_transformer', target_return = 90, rtg_scale = 1):
     """ Calculate the returns to go.
     """
 
@@ -61,7 +62,9 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
         timesteps = np.arange(context_len)
         timesteps = torch.LongTensor(timesteps).reshape(1,context_len).to(device)
         _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
-        action = action_preds[0,-1].argmax().detach().cpu().numpy() # move tensor to cpu() before convert to numpy arrray
+        # action = action_preds[0,-1].argmax().detach().cpu().numpy() # move tensor to cpu() before convert to numpy arrray
+        probs = F.softmax(action_preds[0,-1], dim=-1)
+        action = torch.multinomial(probs, num_samples=1)
     return action
 
 def experiment(variant, device):
@@ -88,6 +91,7 @@ def experiment(variant, device):
     
     state_dim = env.observation_space.shape[0] # state dimension
     act_dim = env.action_space.n # action dimension
+    print(env.reward_range)
 
     if model_type == 'decision_transformer':
         # path_to_model = "decision_transformer/models/dt_runs/dt_breakout-expert-v2_model.pt"
@@ -118,14 +122,14 @@ def experiment(variant, device):
         observation = pre_processing(observation)
         trajectory = get_trajectory(trajectory, observation, action, reward)
 
-        env.render()
+        # env.render()
 
         if terminated:
             env.reset()
 
         if (i+1) % 10000 == 0:
             print(reward)
-            print(trajectory['rewards'])
+            print(sum(trajectory['rewards']))
 
     env.close()
 
