@@ -6,12 +6,26 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 import gym
 import os
-from utils import D4RLTrajectoryDataset, GPTConfig, GPTTrainConfig
-from dt_model import DecisionTransformer
+from utils import D4RLTrajectoryDataset, set_seed
+from dt_model import DecisionTransformer, GPTConfig
 
+set_seed(123)
 # --------------------------------
 # Configuration
 # --------------------------------
+
+class GPTTrainConfig:
+
+    max_eval_ep_len = 1000      # max len of one evaluation episode
+    num_eval_ep = 10            # num of evaluation episodes per iteration
+
+    batch_size = 128            # training batch size
+    lr = 6e-4                   # learning rate
+    wt_decay = 0.1              # weight decay
+    warmup_steps = 512*20       # warmup steps for lr scheduler
+
+    # total updates = max_epochs * num_batches_per_epoch
+    max_epochs = 200            # max number of epochs
 
 device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
@@ -30,7 +44,6 @@ if not os.path.exists(log_dir):
 prefix = "dt_" + env_d4rl_name
 save_model_name =  prefix + "_model" + ".pt"
 save_model_path = os.path.join(log_dir, save_model_name)
-save_best_model_path = save_model_path[:-3] + "_best.pt"
 
 print("=" * 60)
 print("device set to: " + str(device))
@@ -56,8 +69,6 @@ traj_data_loader = DataLoader(traj_dataset,
 						pin_memory=True,
 						drop_last=True,
                         num_workers=4) 
-
-# data_iter = iter(traj_data_loader)
 
 model = DecisionTransformer(state_dim=conf.state_dim,
 							act_dim=conf.act_dim,
@@ -85,13 +96,7 @@ for epoch in range(train_conf.max_epochs):
     log_action_losses = []
     model.train()
 
-    # for _ in range(train_conf.num_updates_per_iter):
     for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(traj_data_loader):
-        # try:
-        #     timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
-        # except StopIteration:
-        #     data_iter = iter(traj_data_loader)
-        #     timesteps, states, actions, returns_to_go, traj_mask = next(data_iter)
 
 		# reshape data before feeding to model
         timesteps = timesteps.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T

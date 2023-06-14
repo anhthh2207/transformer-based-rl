@@ -6,6 +6,16 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+class GPTConfig:
+    def __init__(self, state_dim, act_dim, context_len=30, n_blocks=6, embed_dim=128, n_heads=8, dropout_p=0.1):
+        self.state_dim = state_dim          # state dim
+        self.act_dim = act_dim              # action dim
+        self.context_len = context_len      # context length
+        self.n_blocks = n_blocks            # num of transformer blocks
+        self.embed_dim = embed_dim          # embedding (hidden) dim of transformer
+        self.n_heads = n_heads              # num of transformer heads
+        self.dropout_p = dropout_p          # dropout probability
+
 class MaskedCausalAttention(nn.Module):
     def __init__(self, h_dim, max_T, n_heads, drop_p):
         super().__init__()

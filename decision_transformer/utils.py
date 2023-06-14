@@ -4,31 +4,13 @@ import random
 import numpy as np
 from torch.utils.data import Dataset
 
-class GPTTrainConfig:
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
-    max_eval_ep_len = 1000      # max len of one evaluation episode
-    num_eval_ep = 10            # num of evaluation episodes per iteration
-
-    batch_size = 128            # training batch size
-    lr = 6e-4                   # learning rate
-    wt_decay = 0.1              # weight decay
-    warmup_steps = 512*20       # warmup steps for lr scheduler
-
-    # total updates = max_train_iters x num_updates_per_iter
-    max_epochs = 5
-    # num_updates_per_iter = 50
-
-class GPTConfig:
-    def __init__(self, state_dim, act_dim, context_len=30, n_blocks=6, embed_dim=128, n_heads=8, dropout_p=0.1):
-        self.state_dim = state_dim          # state dim
-        self.act_dim = act_dim              # action dim
-        self.context_len = context_len      # context length
-        self.n_blocks = n_blocks            # num of transformer blocks
-        self.embed_dim = embed_dim          # embedding (hidden) dim of transformer
-        self.n_heads = n_heads              # num of transformer heads
-        self.dropout_p = dropout_p          # dropout probability
-
-def discount_cumsum(x, gamma):
+def discount_cumsum(x, gamma=1.0):
     """ This function computes the ground truth discounted reward at each timestep
     """
     disc_cumsum = np.zeros_like(x)
@@ -51,23 +33,25 @@ class D4RLTrajectoryDataset(Dataset):
         
         # calculate min len of traj, state mean and variance
         # and returns_to_go for all traj
-        min_len = 500000
-        # states = []
+        # min_len = 500000
+        states = []
+        max_rtg = 0
         for traj in self.trajectories:
-            traj_len = traj['observations'].shape[0]
-            min_len = min(min_len, traj_len)
-            # states.append(traj['observations'])
+            # traj_len = traj['observations'].shape[0]
+            # min_len = min(min_len, traj_len)
+            states.append(traj['observations'])
             # calculate returns to go and rescale them
-            traj['returns_to_go'] = discount_cumsum(traj['rewards'], 1.0)
+            traj['returns_to_go'] = discount_cumsum(traj['rewards'])
+            max_rtg = max(max_rtg, np.max(traj['returns_to_go']))
+        print('Max return-to-go in dataset:', max_rtg)
 
         # used for input normalization
-        # states = np.concatenate(states, axis=0)
-        # self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
+        states = np.concatenate(states, axis=0)
+        self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
 
         # normalize states
         for traj in self.trajectories:
-            # traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
-            traj['observations'] = traj['observations'] / 255.
+            traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
 
     def __len__(self):
         return len(self.trajectories)
@@ -81,6 +65,7 @@ class D4RLTrajectoryDataset(Dataset):
             si = random.randint(0, traj_len - self.context_len)
 
             states = torch.from_numpy(traj['observations'][si : si + self.context_len])
+            states = states / 255.
             actions = torch.from_numpy(traj['actions'][si : si + self.context_len])
             returns_to_go = torch.from_numpy(traj['returns_to_go'][si : si + self.context_len])
             timesteps = torch.arange(start=si, end=si+self.context_len, step=1)

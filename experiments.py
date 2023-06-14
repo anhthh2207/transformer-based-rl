@@ -6,8 +6,7 @@ import numpy as np
 from skimage.color import rgb2gray
 from skimage.transform import resize
 
-from decision_transformer.dt_model import DecisionTransformer
-from decision_transformer.utils import GPTConfig
+from decision_transformer.dt_model import DecisionTransformer, GPTConfig
 
 # 210*160*3(color) --> 84*84(mono)
 # float --> integer (to reduce the size of replay memory)
@@ -16,22 +15,27 @@ def pre_processing(observe):
         resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
     return processed_observe / 255.
 
-def get_trajectory(trajectory, observation, action, reward):
+def get_trajectory(trajectory, observation, action, reward, step):
     """ Collect observed trajectory from the environment.
     """
 
     trajectory['observations'].append(observation)
     trajectory['actions'].append(action)
     trajectory['rewards'].append(reward)
+    trajectory['steps'].append(step)
 
     return trajectory
 
-def get_returns(rewards, model='decision_transformer', target_return = 90, rtg_scale = 1):
+def get_returns(rewards, model='decision_transformer', target_return = 68, rtg_scale = 1):
     """ Calculate the returns to go.
     """
 
     if model == 'decision_transformer':
-        returns_to_go = [target_return - reward/rtg_scale for reward in rewards]
+        returns_to_go = np.zeros(len(rewards))
+        for i in range(len(rewards)):
+            for j in range(i):
+                returns_to_go[i] += rewards[j]/rtg_scale
+            returns_to_go[i] = target_return - returns_to_go[i]
         return returns_to_go
 
 def make_action(trajectory, model, context_len, device, model_type='decision_transformer'):
@@ -45,6 +49,7 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
         states = torch.zeros((context_len, state_dim, state_dim))
         actions = np.zeros(context_len)
         returns_to_go = np.zeros(context_len)
+        timesteps = np.zeros(context_len)
 
         rewards = trajectory['rewards']
         rtg = get_returns(rewards, model=model_type)
@@ -55,11 +60,10 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
             actions[context_len-i-1] = action
             return_to_go = rtg[-i]
             returns_to_go[context_len-i-1] = return_to_go
-
+            timesteps[context_len-i-1] = trajectory['steps'][-i]
         states = states.reshape(1,context_len,state_dim,state_dim).to(device)
         actions = torch.from_numpy(actions).long().reshape(1,context_len).to(device)
         returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len).to(device)
-        timesteps = np.arange(context_len)
         timesteps = torch.LongTensor(timesteps).reshape(1,context_len).to(device)
         with torch.no_grad():
             _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
@@ -91,7 +95,6 @@ def experiment(variant, device):
     
     state_dim = env.observation_space.shape[0] # state dimension
     act_dim = env.action_space.n # action dimension
-    print(env.reward_range)
 
     if model_type == 'decision_transformer':
         conf = GPTConfig(state_dim=state_dim,
@@ -106,36 +109,41 @@ def experiment(variant, device):
         # move model to device
         model = model.to(device)
         # Load the trained weights
-        # path_to_model = "decision_transformer\dt_runs\dt_breakout-expert-v2_model.pt"
-        # if torch.cuda.is_available():
-        #     model.load_state_dict(torch.load(path_to_model)).to(device)
-        # else:
-        #     model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
+        path_to_model = "decision_transformer/dt_runs/dt_breakout-expert-v2_model.pt"
+        if torch.cuda.is_available():
+            model.load_state_dict(torch.load(path_to_model))
+        else:
+            model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
 
     max_play = 500000 # maximum number of play steps
 
-    trajectory = {'observations': [], 'actions': [], 'rewards': []}
+    trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+    step = 0
+
+    
 
     for i in range(max_play):
         action = make_action(trajectory, model, conf.context_len, device, model_type)
         observation, reward, terminated, info = env.step(action)
         observation = pre_processing(observation)
-        trajectory = get_trajectory(trajectory, observation, action, reward)
+        trajectory = get_trajectory(trajectory, observation, action, reward, step)
+        step += 1
 
         env.render()
 
         if terminated:
+            print('Sum reward:', sum(trajectory['rewards']))
+            trajectory.clear()
+            trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+            step = 0
             env.reset()
-            print(reward)
-            print(sum(trajectory['rewards']))
 
     env.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--game', type=str, default='breakout', help='Available games: boxing, alien, breakout')
-    parser.add_argument('--dataset', type=str, default='expert', help='Dataset types: mixed, medium, expert') 
     parser.add_argument('--model_type', type=str, default='decision_transformer', help='Model options: decision_transformer, trajectory_transformer, conservative_q_learning') 
     
     args = parser.parse_args()
