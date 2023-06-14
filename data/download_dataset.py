@@ -41,7 +41,7 @@ for env_name in ['breakout']:
 				# final_timestep determines whether the episode is done due to timeout
 				final_timestep = dataset['timeouts'][i]
 			else:
-				final_timestep = (episode_step == 500000-1)
+				final_timestep = (episode_step == 4096)
 			
 			# Construct the data for the current episode
 			for k in ['observations', 'next_observations', 'actions', 'rewards', 'terminals']:

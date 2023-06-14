@@ -61,10 +61,10 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
         returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len).to(device)
         timesteps = np.arange(context_len)
         timesteps = torch.LongTensor(timesteps).reshape(1,context_len).to(device)
-        _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
-        # action = action_preds[0,-1].argmax().detach().cpu().numpy() # move tensor to cpu() before convert to numpy arrray
-        probs = F.softmax(action_preds[0,-1], dim=-1)
-        action = torch.multinomial(probs, num_samples=1)
+        with torch.no_grad():
+            _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
+            probs = F.softmax(action_preds[0,-1], dim=-1)
+            action = torch.multinomial(probs, num_samples=1)
     return action
 
 def experiment(variant, device):
@@ -106,11 +106,11 @@ def experiment(variant, device):
         # move model to device
         model = model.to(device)
         # Load the trained weights
-        path_to_model = "decision_transformer\dt_runs\dt_breakout-expert-v2_model.pt"
-        if torch.cuda.is_available():
-            model.load_state_dict(torch.load(path_to_model)).to(device)
-        else:
-            model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
+        # path_to_model = "decision_transformer\dt_runs\dt_breakout-expert-v2_model.pt"
+        # if torch.cuda.is_available():
+        #     model.load_state_dict(torch.load(path_to_model)).to(device)
+        # else:
+        #     model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
 
     max_play = 500000 # maximum number of play steps
@@ -123,7 +123,7 @@ def experiment(variant, device):
         observation = pre_processing(observation)
         trajectory = get_trajectory(trajectory, observation, action, reward)
 
-        # env.render()
+        env.render()
 
         if terminated:
             env.reset()
