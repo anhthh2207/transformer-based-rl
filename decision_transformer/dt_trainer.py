@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 import gym
 import os
 from utils import D4RLTrajectoryDataset, set_seed
@@ -25,7 +25,7 @@ class GPTTrainConfig:
     warmup_steps = 512*20       # warmup steps for lr scheduler
 
     # total updates = max_epochs * num_batches_per_epoch
-    max_epochs = 200            # max number of epochs
+    max_epochs = 5              # max number of epochs
 
 device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
@@ -61,15 +61,6 @@ act_dim = env.action_space.n # 4
 conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
 train_conf = GPTTrainConfig()
 
-traj_dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
-
-traj_data_loader = DataLoader(traj_dataset,
-						batch_size=train_conf.batch_size,
-						shuffle=True,
-						pin_memory=True,
-						drop_last=True,
-                        num_workers=4) 
-
 model = DecisionTransformer(state_dim=conf.state_dim,
 							act_dim=conf.act_dim,
 							n_blocks=conf.n_blocks,
@@ -96,7 +87,15 @@ for epoch in range(train_conf.max_epochs):
     log_action_losses = []
     model.train()
 
-    for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(traj_data_loader):
+    dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
+    loader = DataLoader(dataset,
+                        batch_size=train_conf.batch_size,
+                        shuffle=True,
+                        pin_memory=True,
+                        drop_last=True,
+                        num_workers=4) 
+
+    for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(loader):
 
 		# reshape data before feeding to model
         timesteps = timesteps.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T
@@ -120,6 +119,7 @@ for epoch in range(train_conf.max_epochs):
         action_preds = action_preds.view(-1, act_dim)[traj_mask.view(-1,) > 0]
         action_target = action_target.type(torch.float32).view(-1, act_dim)[traj_mask.view(-1,) > 0]
 
+        # cross-entropy loss for discrete action, mse for continuous action
         action_loss = F.cross_entropy(action_preds, action_target)
 
         optimizer.zero_grad()

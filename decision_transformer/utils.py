@@ -29,70 +29,73 @@ class D4RLTrajectoryDataset(Dataset):
 
         # load dataset
         with open(dataset_path, 'rb') as f:
-            self.trajectories = pickle.load(f)
+            trajectories = pickle.load(f)
         
-        # calculate min len of traj, state mean and variance
-        # and returns_to_go for all traj
-        # min_len = 500000
-        states = []
-        max_rtg = 0
-        for traj in self.trajectories:
-            # traj_len = traj['observations'].shape[0]
-            # min_len = min(min_len, traj_len)
-            states.append(traj['observations'])
-            # calculate returns to go and rescale them
-            traj['returns_to_go'] = discount_cumsum(traj['rewards'])
-            max_rtg = max(max_rtg, np.max(traj['returns_to_go']))
-        print('Max return-to-go in dataset:', max_rtg)
-
-        # used for input normalization
-        states = np.concatenate(states, axis=0)
-        self.state_mean, self.state_std = np.mean(states, axis=0), np.std(states, axis=0) + 1e-6
-
-        # normalize states
-        for traj in self.trajectories:
-            traj['observations'] = (traj['observations'] - self.state_mean) / self.state_std
+        self.states = np.array(trajectories[0]['observations'])
+        self.actions = np.array(trajectories[0]['actions'])
+        self.rtg = np.array(discount_cumsum(trajectories[0]['rewards']))
+        self.timesteps = np.arange(trajectories[0]['observations'].shape[0])
+        self.terminal_idxs = [trajectories[0]['observations'].shape[0]]
+        for i in range(1, len(trajectories)):
+            self.states = np.concatenate((self.states, trajectories[i]['observations']), axis=0)
+            self.actions = np.concatenate((self.actions, trajectories[i]['actions']))
+            traj_rtg = np.array(discount_cumsum(trajectories[i]['rewards']))
+            self.rtg = np.concatenate((self.rtg, traj_rtg))
+            traj_len = trajectories[i]['observations'].shape[0]
+            steps = np.arange(traj_len)
+            self.timesteps = np.concatenate((self.timesteps, steps))
+            terminal_idx = self.terminal_idxs[-1] + traj_len
+            self.terminal_idxs.append(terminal_idx)
+        
+        print('Max return-to-go in the dataset:', np.max(self.rtg))
 
     def __len__(self):
         return len(self.trajectories)
 
     def __getitem__(self, idx):
-        traj = self.trajectories[idx]
-        traj_len = traj['observations'].shape[0]
+        
+        # check if idx + context_len is within the same trajectory
+        padding = False
+        for terminal_idx in self.terminal_idxs:
+            if idx < terminal_idx:
+                if idx + self.context_len > terminal_idx:
+                    non_padding_len = terminal_idx - idx
+                    padding = True
+                break
 
-        if traj_len >= self.context_len:
-            # sample random index to slice trajectory
-            si = random.randint(0, traj_len - self.context_len)
+        if padding == False:
 
-            states = torch.from_numpy(traj['observations'][si : si + self.context_len])
+            states = torch.from_numpy(self.states[idx : idx + self.context_len])
             states = states / 255.
-            actions = torch.from_numpy(traj['actions'][si : si + self.context_len])
-            returns_to_go = torch.from_numpy(traj['returns_to_go'][si : si + self.context_len])
-            timesteps = torch.arange(start=si, end=si+self.context_len, step=1)
+            actions = torch.from_numpy(self.actions[idx : idx + self.context_len])
+            returns_to_go = torch.from_numpy(self.rtg[idx : idx + self.context_len])
+            timesteps = torch.from_numpy(self.timesteps[idx : idx + self.context_len])
 
-            # all ones since no padding
+            # all ones idxnce no padding
             traj_mask = torch.ones(self.context_len, dtype=torch.long)
 
         else:
-            padding_len = self.context_len - traj_len
+            padding_len = self.context_len - non_padding_len
 
             # padding with zeros
-            states = torch.from_numpy(traj['observations'])
-            states = torch.cat([states, torch.zeros(([padding_len] + list(states.shape[1:])), dtype=states.dtype)], 
+            states = torch.from_numpy(self.states[idx : idx + non_padding_len])
+            states = torch.cat([torch.zeros(([padding_len] + list(states.shape[1:])), dtype=states.dtype), states], 
                                 dim=0)
             
-            actions = torch.from_numpy(traj['actions'])
-            actions = torch.cat([actions, torch.zeros(([padding_len] + list(actions.shape[1:])), dtype=actions.dtype)], 
+            actions = torch.from_numpy(self.actions[idx : idx + non_padding_len])
+            actions = torch.cat([torch.zeros(([padding_len] + list(actions.shape[1:])), dtype=actions.dtype), actions], 
                                dim=0)
 
-            returns_to_go = torch.from_numpy(traj['returns_to_go'])
-            returns_to_go = torch.cat([returns_to_go, torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype)], 
+            returns_to_go = torch.from_numpy(self.returns_to_go[idx : idx + non_padding_len])
+            returns_to_go = torch.cat([torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype), returns_to_go], 
                                         dim=0)
             
-            timesteps = torch.arange(start=0, end=self.context_len, step=1)
+            timesteps = torch.from_numpy(self.timesteps[idx : idx + non_padding_len])
+            timesteps = torch.cat([torch.zeros(([padding_len] + list(timesteps.shape[1:])), dtype=timesteps.dtype), timesteps], 
+                               dim=0)
 
-            traj_mask = torch.cat([torch.ones(traj_len, dtype=torch.long), 
-                                   torch.zeros(padding_len, dtype=torch.long)], 
+            traj_mask = torch.cat([torch.zeros(padding_len, dtype=torch.long),
+                                   torch.ones(non_padding_len, dtype=torch.long)], 
                                   dim=0)
             
         return  timesteps, states.squeeze(), actions, returns_to_go, traj_mask

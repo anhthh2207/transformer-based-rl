@@ -90,7 +90,7 @@ class Block(nn.Module):
 
 class DecisionTransformer(nn.Module):
     def __init__(self, state_dim, act_dim, n_blocks, h_dim, context_len, 
-                 n_heads, drop_p, max_timestep=4096):
+                 n_heads, drop_p, max_timestep=1000):
         super().__init__()
 
         self.state_dim = state_dim
@@ -146,6 +146,9 @@ class DecisionTransformer(nn.Module):
             module.weight.data.fill_(1.0)
 
     def forward(self, timesteps, states, actions, returns_to_go):
+        # current model uses returns_to_go to estimate long term cumulative reward
+        # TODO: exclude return, only predict based on timesteps, states, and actions
+        # TODO: predict based on received returns instead of returns_to_go
 
         B = states.shape[0] # batch size, context length, state_dim, state_dim
         T = timesteps.shape[1] # context length
@@ -181,6 +184,8 @@ class DecisionTransformer(nn.Module):
         state_preds = self.predict_state(h[:,2]).reshape(B, T, self.state_dim, self.state_dim)    # predict next state given r, s, a
         action_preds = self.predict_action(h[:,1])  # predict action given r, s
     
+        # In the original paper, it is stated that predicting the states and returns are not necessary
+        # and does not improve the performance. However, it could be an interesting study for future work.
         return state_preds, action_preds, return_preds
 
     # @classmethod

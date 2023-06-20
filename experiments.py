@@ -8,9 +8,12 @@ from skimage.transform import resize
 
 from decision_transformer.dt_model import DecisionTransformer, GPTConfig
 
-# 210*160*3(color) --> 84*84(mono)
-# float --> integer (to reduce the size of replay memory)
 def pre_processing(observe):
+    """ Preprocess the images
+        210*160*3(color) --> 84*84(mono)
+        float --> integer (to reduce the size of replay memory)
+    """
+
     processed_observe = np.uint8(
         resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
     return processed_observe / 255.
@@ -26,7 +29,7 @@ def get_trajectory(trajectory, observation, action, reward, step):
 
     return trajectory
 
-def get_returns(rewards, model='decision_transformer', target_return = 68, rtg_scale = 1):
+def get_returns(rewards, model='decision_transformer', target_return = 90, rtg_scale = 1):
     """ Calculate the returns to go.
     """
 
@@ -61,6 +64,7 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
             return_to_go = rtg[-i]
             returns_to_go[context_len-i-1] = return_to_go
             timesteps[context_len-i-1] = trajectory['steps'][-i]
+            
         states = states.reshape(1,context_len,state_dim,state_dim).to(device)
         actions = torch.from_numpy(actions).long().reshape(1,context_len).to(device)
         returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len).to(device)
@@ -116,12 +120,10 @@ def experiment(variant, device):
             model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
 
-    max_play = 500000 # maximum number of play steps
+    max_play = 1000 # maximum number of play steps
 
     trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
     step = 0
-
-    
 
     for i in range(max_play):
         action = make_action(trajectory, model, conf.context_len, device, model_type)
