@@ -25,12 +25,13 @@ class D4RLTrajectoryDataset(Dataset):
 
     def __init__(self, dataset_path, context_len):
 
-        self.context_len = context_len        
+        self.context_len = context_len
 
         # load dataset
         with open(dataset_path, 'rb') as f:
             trajectories = pickle.load(f)
         
+        # stack all the states, actions, returns-to-go, timesteps
         self.states = np.array(trajectories[0]['observations'])
         self.actions = np.array(trajectories[0]['actions'])
         self.rtg = np.array(discount_cumsum(trajectories[0]['rewards']))
@@ -50,7 +51,7 @@ class D4RLTrajectoryDataset(Dataset):
         print('Max return-to-go in the dataset:', np.max(self.rtg))
 
     def __len__(self):
-        return len(self.trajectories)
+        return self.states.shape[0]
 
     def __getitem__(self, idx):
         
@@ -71,14 +72,14 @@ class D4RLTrajectoryDataset(Dataset):
             returns_to_go = torch.from_numpy(self.rtg[idx : idx + self.context_len])
             timesteps = torch.from_numpy(self.timesteps[idx : idx + self.context_len])
 
-            # all ones idxnce no padding
+            # all ones since no padding
             traj_mask = torch.ones(self.context_len, dtype=torch.long)
 
         else:
             padding_len = self.context_len - non_padding_len
 
             # padding with zeros
-            states = torch.from_numpy(self.states[idx : idx + non_padding_len])
+            states = torch.from_numpy(self.states[idx : idx + non_padding_len]) / 255.
             states = torch.cat([torch.zeros(([padding_len] + list(states.shape[1:])), dtype=states.dtype), states], 
                                 dim=0)
             
@@ -86,7 +87,7 @@ class D4RLTrajectoryDataset(Dataset):
             actions = torch.cat([torch.zeros(([padding_len] + list(actions.shape[1:])), dtype=actions.dtype), actions], 
                                dim=0)
 
-            returns_to_go = torch.from_numpy(self.returns_to_go[idx : idx + non_padding_len])
+            returns_to_go = torch.from_numpy(self.rtg[idx : idx + non_padding_len])
             returns_to_go = torch.cat([torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype), returns_to_go], 
                                         dim=0)
             
