@@ -29,7 +29,7 @@ class D4RLTrajectoryDataset(Dataset):
 
         # load dataset
         with open(dataset_path, 'rb') as f:
-            trajectories = pickle.load(f)
+            trajectories = pickle.load(f).cpu()
         
         # stack all the states, actions, returns-to-go, timesteps
         self.states = np.array(trajectories[0]['observations'])
