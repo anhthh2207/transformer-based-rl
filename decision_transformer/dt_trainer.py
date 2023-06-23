@@ -12,24 +12,19 @@ import argparse
 class Trainer:
     def __init__(self, batch_size, lr, wt_decay, warmup_steps, max_epochs):
         self.batch_size = batch_size
-        self.lr = lr
-        self.wt_decay = wt_decay
-        self.warmup_steps = warmup_steps
         self.max_epochs = max_epochs
 
-    def train(self, model, dataset_path, conf, device):
-
-        optimizer = torch.optim.AdamW(
+        self.optimizer = torch.optim.AdamW(
                         model.parameters(), 
-                        lr=self.lr, 
-                        weight_decay=self.wt_decay
+                        lr=lr, 
+                        weight_decay=wt_decay
                     )
-
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer,
-            lambda steps: min((steps+1)/self.warmup_steps, 1)
+        self.scheduler = torch.optim.lr_scheduler.LambdaLR(
+            self.optimizer,
+            lambda steps: min((steps+1)/warmup_steps, 1)
         )
 
+    def train(self, model, dataset_path, conf, device):
         total_updates = 0
 
         # training loop
@@ -69,11 +64,11 @@ class Trainer:
                 # cross-entropy loss for discrete action, mse for continuous action
                 action_loss = F.cross_entropy(action_preds, action_target)
 
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 action_loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                optimizer.step()
-                scheduler.step()
+                self.optimizer.step()
+                self.scheduler.step()
 
                 log_action_losses.append(action_loss.detach().cpu().item())
                 total_updates += 1
