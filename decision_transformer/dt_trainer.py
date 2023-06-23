@@ -7,96 +7,99 @@ import gym
 import os
 from utils import D4RLTrajectoryDataset, set_seed
 from dt_model import DecisionTransformer, GPTConfig
+import argparse
 
-set_seed(123)
+class Trainer:
+    def __init__(self, batch_size, lr, wt_decay, warmup_steps, max_epochs):
+        self.batch_size = batch_size
+        self.lr = lr
+        self.wt_decay = wt_decay
+        self.warmup_steps = warmup_steps
+        self.max_epochs = max_epochs
 
-class GPTTrainConfig:
+    def train(self, model, dataset_path, conf, device):
 
-    max_eval_ep_len = 1000      # max len of one evaluation episode
-    num_eval_ep = 10            # num of evaluation episodes per iteration
+        optimizer = torch.optim.AdamW(
+                        model.parameters(), 
+                        lr=self.lr, 
+                        weight_decay=self.wt_decay
+                    )
 
-    batch_size = 128            # training batch size
-    lr = 6e-4                   # learning rate
-    wt_decay = 0.1              # weight decay
-    warmup_steps = 512*20       # warmup steps for lr scheduler
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer,
+            lambda steps: min((steps+1)/self.warmup_steps, 1)
+        )
 
-    # total updates = max_epochs * num_batches_per_epoch
-    max_epochs = 5              # max number of epochs
+        total_updates = 0
 
-def trainer(train_conf, model, dataset_path, conf, device):
+        # training loop
+        for epoch in range(self.max_epochs):
+            log_action_losses = []
+            model.train()
 
-    optimizer = torch.optim.AdamW(
-					model.parameters(), 
-					lr=train_conf.lr, 
-					weight_decay=train_conf.wt_decay
-				)
+            dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
+            loader = DataLoader(dataset,
+                                batch_size=self.batch_size,
+                                shuffle=True, pin_memory=True,
+                                drop_last=True,
+                                num_workers=4) 
 
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer,
-        lambda steps: min((steps+1)/train_conf.warmup_steps, 1)
-    )
+            for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(loader):
 
-    total_updates = 0
+                # reshape data before feeding to model
+                timesteps = timesteps.reshape(self.batch_size,conf.context_len).to(device)	# B x T
+                states = states.reshape(self.batch_size,conf.context_len,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)			# B x T x state_dim
+                actions = actions.reshape(self.batch_size,conf.context_len).to(dtype=torch.float32, device=device)		# B x T x act_dim
+                returns_to_go = returns_to_go.reshape(self.batch_size,conf.context_len).to(device) # B x T x 1
+                traj_mask = traj_mask.reshape(self.batch_size,conf.context_len).to(device)	# B x T
 
-    # training loop
-    for epoch in range(train_conf.max_epochs):
-        log_action_losses = []
-        model.train()
+                # ground truth actions
+                action_target = torch.clone(actions).detach().to(device)
+                action_target = torch.nn.functional.one_hot(action_target.to(torch.int64), conf.act_dim)
 
-        dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
-        loader = DataLoader(dataset,
-                            batch_size=train_conf.batch_size,
-                            shuffle=True, pin_memory=True,
-                            drop_last=True,
-                            num_workers=4) 
+                _, action_preds, _ = model.forward(timesteps=timesteps,
+                                                    states=states,
+                                                    actions=actions,
+                                                    returns_to_go=returns_to_go)
 
-        for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(loader):
+                # only consider non padded elements
+                action_preds = action_preds.view(-1, act_dim)[traj_mask.view(-1,) > 0]
+                action_target = action_target.type(torch.float32).view(-1, act_dim)[traj_mask.view(-1,) > 0]
 
-            # reshape data before feeding to model
-            timesteps = timesteps.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T
-            states = states.reshape(train_conf.batch_size,conf.context_len,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)			# B x T x state_dim
-            actions = actions.reshape(train_conf.batch_size,conf.context_len).to(dtype=torch.float32, device=device)		# B x T x act_dim
-            returns_to_go = returns_to_go.reshape(train_conf.batch_size,conf.context_len).to(device) # B x T x 1
-            traj_mask = traj_mask.reshape(train_conf.batch_size,conf.context_len).to(device)	# B x T
+                # cross-entropy loss for discrete action, mse for continuous action
+                action_loss = F.cross_entropy(action_preds, action_target)
 
-            # ground truth actions
-            action_target = torch.clone(actions).detach().to(device)
-            action_target = torch.nn.functional.one_hot(action_target.to(torch.int64), conf.act_dim)
+                optimizer.zero_grad()
+                action_loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                optimizer.step()
+                scheduler.step()
 
-            _, action_preds, _ = model.forward(timesteps=timesteps,
-                                                states=states,
-                                                actions=actions,
-                                                returns_to_go=returns_to_go)
+                log_action_losses.append(action_loss.detach().cpu().item())
+                total_updates += 1
 
-            # only consider non padded elements
-            action_preds = action_preds.view(-1, act_dim)[traj_mask.view(-1,) > 0]
-            action_target = action_target.type(torch.float32).view(-1, act_dim)[traj_mask.view(-1,) > 0]
+            mean_action_loss = np.mean(log_action_losses)
 
-            # cross-entropy loss for discrete action, mse for continuous action
-            action_loss = F.cross_entropy(action_preds, action_target)
+            log_str = ("=" * 60 + '\n' +
+                    "epoch: " + str(epoch) + '\n' +
+                    "num of updates: " + str(total_updates) + '\n' +
+                    "action loss: " +  format(mean_action_loss, ".5f")
+                    )
+            print(log_str)
 
-            optimizer.zero_grad()
-            action_loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-            optimizer.step()
-            scheduler.step()
-
-            log_action_losses.append(action_loss.detach().cpu().item())
-            total_updates += 1
-
-        mean_action_loss = np.mean(log_action_losses)
-
-        log_str = ("=" * 60 + '\n' +
-                "epoch: " + str(epoch) + '\n' +
-                "num of updates: " + str(total_updates) + '\n' +
-                "action loss: " +  format(mean_action_loss, ".5f")
-                )
-        print(log_str)
-
-    # save model
-    torch.save(model.state_dict(), save_model_path)
+        # save model
+        torch.save(model.state_dict(), save_model_path)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--seed', type=int, default=123)
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--lr', type=int, default=6e-4)
+    parser.add_argument('--wt_decay', type=int, default=0.1)
+    parser.add_argument('--warmup_steps', type=int, default=512*20)
+    args = parser.parse_args()
+    set_seed(args.seed)
 
     device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
@@ -127,7 +130,6 @@ if __name__ == "__main__":
     act_dim = env.action_space.n # 4
 
     conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
-    train_conf = GPTTrainConfig()
 
     model = DecisionTransformer(state_dim=conf.state_dim,
 							act_dim=conf.act_dim,
@@ -137,8 +139,9 @@ if __name__ == "__main__":
 							n_heads=conf.n_heads,
 							drop_p=conf.dropout_p).to(device)
     
-    # start training
-    trainer(train_conf, model, dataset_path, conf, device)
+    # start training    
+    trainer = Trainer(args.batch_size, args.lr, args.wt_decay, args.warmup_steps, args.epochs)
+    trainer.train(model, dataset_path, conf, device)
 
     print("=" * 60)
     print("finished training!")

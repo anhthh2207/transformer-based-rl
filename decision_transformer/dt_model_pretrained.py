@@ -7,7 +7,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 class GPTConfig:
-    def __init__(self, state_dim, act_dim, context_len=30, n_blocks=6, embed_dim=128, n_heads=8, dropout_p=0.1):
+    def __init__(self, state_dim=84, act_dim=4, context_len=30, n_blocks=12, embed_dim=768, n_heads=12, dropout_p=0.1):
         self.state_dim = state_dim          # state dim
         self.act_dim = act_dim              # action dim
         self.context_len = context_len      # context length
@@ -183,3 +183,39 @@ class DecisionTransformer(nn.Module):
         # In the original paper, it is stated that predicting the states and returns are not necessary
         # and does not improve the performance. However, it could be an interesting study for future work.
         return state_preds, action_preds, return_preds
+
+    @classmethod
+    def from_pretrained(cls, model_type='gpt2'):
+        """
+        Initialize a pretrained GPT model by copying over the weights
+        from a huggingface/transformers checkpoint.
+        """
+        assert model_type in {'gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'}
+        from transformers import GPT2LMHeadModel
+
+        # create a from-scratch initialized dt model
+        # config = cls.get_default_config()
+        config = GPTConfig()
+        model = DecisionTransformer(config)
+        sd = model.transformer.state_dict()
+
+        # init a huggingface/transformers model
+        model_hf = GPT2LMHeadModel.from_pretrained(model_type)
+        sd_hf = model_hf.state_dict()
+
+        # copy while ensuring all of the parameters are aligned and match in names and shapes
+        keys = [k for k in sd_hf if not k.endswith('attn.masked_bias')] # ignore these
+        transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
+        # basically the openai checkpoints use a "Conv1D" module, but we only want to use a vanilla nn.Linear.
+        # this means that we have to transpose these weights when we import them
+        # assert len(keys) == len(sd)
+        for k in keys:
+            if any(k.endswith(w) for w in transposed):
+                # special treatment for the Conv1D weights we need to transpose
+                with torch.no_grad():
+                    sd[k].copy_(sd_hf[k].t())
+            else:
+                # vanilla copy over the other parameters
+                with torch.no_grad():
+                    sd[k].copy_(sd_hf[k])
+        return model

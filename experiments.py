@@ -120,7 +120,7 @@ def experiment(variant, device):
             model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
 
-    max_play = 1000 # maximum number of play steps
+    max_play = 5000 # maximum number of play steps
 
     trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
     step = 0
