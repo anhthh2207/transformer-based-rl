@@ -1,10 +1,3 @@
-""" This program evaluates the dt model on 1% of the dataset.
-    Achieved (normalized) score on the original paper: ~267.5 for 500 thousand transitions
-    -> score = 180?
-    There is no evaluation in the original paper, 
-    500000 transitions are also training transitions and they claim the training accuracy.
-"""
-
 import gym
 import torch
 from torch.nn import functional as F
@@ -120,8 +113,6 @@ def experiment(device):
         action = make_action(trajectory, model, conf.context_len, device)
         observation, reward, terminated, info = env.step(action)
         observation = pre_processing(observation)
-        # print(np.max(observation))
-        # print(np.sum(observation))
         trajectory = get_trajectory(trajectory, observation, action, reward, step)
         step += 1
         sum_reward += reward
@@ -136,10 +127,10 @@ def experiment(device):
             env.reset()
 
     env.close()
-    print("=" * 60)
-    print("Sum reward:", sum_reward)
-    print("Number of episodes:", episodes, "out of", max_play, "steps")
-    print("Average reward:", sum_reward/episodes)
+    # print("=" * 60)
+    # print("Sum reward:", sum_reward)
+    # print("Number of episodes:", episodes, "out of", max_play, "steps")
+    # print("Average reward:", sum_reward/episodes)
 
 if __name__ == '__main__':
     device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
