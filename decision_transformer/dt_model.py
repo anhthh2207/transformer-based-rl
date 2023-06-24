@@ -90,7 +90,7 @@ class Block(nn.Module):
 
 class DecisionTransformer(nn.Module):
     def __init__(self, state_dim, act_dim, n_blocks, h_dim, context_len, 
-                 n_heads, drop_p, max_timestep=1000):
+                 n_heads, drop_p, max_timestep=108e3):
         super().__init__()
 
         self.state_dim = state_dim

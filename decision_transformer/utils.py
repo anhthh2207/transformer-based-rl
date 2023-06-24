@@ -93,7 +93,7 @@ class D4RLTrajectoryDataset(Dataset):
             
             timesteps = torch.from_numpy(self.timesteps[idx : idx + non_padding_len])
             timesteps = torch.cat([torch.zeros(([padding_len] + list(timesteps.shape[1:])), dtype=timesteps.dtype), timesteps], 
-                               dim=0)
+                                 dim=0)
 
             traj_mask = torch.cat([torch.zeros(padding_len, dtype=torch.long),
                                    torch.ones(non_padding_len, dtype=torch.long)], 
