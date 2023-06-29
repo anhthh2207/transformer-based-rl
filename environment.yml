@@ -6,6 +6,7 @@ dependencies:
 - anaconda
 - cudatoolkit=10.
 - numpy
+- opencv
 - pip
 - pip:
   - gym==0.17.2

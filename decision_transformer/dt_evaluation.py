@@ -1,21 +1,49 @@
 import gym
+from gym.wrappers import AtariPreprocessing, TransformReward, FrameStack
 import torch
 from torch.nn import functional as F
 import numpy as np
-from skimage.color import rgb2gray
-from skimage.transform import resize
 
 from dt_model import DecisionTransformer, GPTConfig
 
-def pre_processing(observe):
-    """ Preprocess the images
-        210*160*3(color) --> 84*84(mono)
-        float --> integer (to reduce the size of replay memory)
-    """
+class AtariEnv(gym.Env):
+    def __init__(self,
+                 game,
+                 stack=False,
+                 sticky_action=False,
+                 clip_reward=False,
+                 terminal_on_life_loss=False,
+                 **kwargs):
+        # set action_probability=0.25 if sticky_action=True
+        env_id = '{}NoFrameskip-v{}'.format(game, 0 if sticky_action else 4)
 
-    processed_observe = np.uint8(
-        resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
-    return processed_observe / 255.
+        # use official atari wrapper
+        env = AtariPreprocessing(gym.make(env_id),
+                                 terminal_on_life_loss=terminal_on_life_loss)
+
+        if stack:
+            env = FrameStack(env, num_stack=4)
+
+        if clip_reward:
+            env = TransformReward(env, lambda r: np.clip(r, -1.0, 1.0))
+
+        self._env = env
+
+        self.observation_space = env.observation_space
+        self.action_space = env.action_space
+
+    def step(self, action):
+        return self._env.step(action)
+
+    def reset(self):
+        return self._env.reset()
+
+    def render(self, mode='human'):
+        self._env.render(mode)
+
+    def seed(self, seed=None):
+        super().seed(seed)
+        self._env.seed(seed)
 
 def get_trajectory(trajectory, observation, action, reward, step):
     """ Collect observed trajectory from the environment.
@@ -71,14 +99,15 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
         with torch.no_grad():
             _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
             probs = F.softmax(action_preds[0,-1], dim=-1)
-            # action = torch.multinomial(probs, num_samples=1)
+            action = torch.multinomial(probs, num_samples=1)
             # take the max action
-            action = torch.argmax(probs)
+            # action = torch.argmax(probs)
     return action
 
 def experiment(device):
-    env = gym.make('Breakout-v4')
-    env.observation_space.shape = (84, 84)  # resized gray-scale image
+
+    env = AtariEnv(game='Breakout')
+    print("Observation space:", env.observation_space)
     
     env.reset()
     
@@ -102,7 +131,7 @@ def experiment(device):
         model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
     model.eval()
 
-    max_play = 5000 # maximum number of play steps
+    max_play = 999 # maximum number of play steps
 
     trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
     step = 0
@@ -112,8 +141,7 @@ def experiment(device):
     for i in range(max_play):
         action = make_action(trajectory, model, conf.context_len, device)
         observation, reward, terminated, info = env.step(action)
-        observation = pre_processing(observation)
-        trajectory = get_trajectory(trajectory, observation, action, reward, step)
+        trajectory = get_trajectory(trajectory, observation/255., action, reward, step)
         step += 1
         sum_reward += reward
 
@@ -127,9 +155,9 @@ def experiment(device):
             env.reset()
 
     env.close()
-    # print("=" * 60)
-    # print("Sum reward:", sum_reward)
-    # print("Number of episodes:", episodes, "out of", max_play, "steps")
+    print("=" * 60)
+    print("Sum reward:", sum_reward)
+    print("Number of episodes:", episodes, "out of", max_play, "steps")
     # print("Average reward:", sum_reward/episodes)
 
 if __name__ == '__main__':

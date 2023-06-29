@@ -20,6 +20,7 @@ for env_name in ['breakout']:
 	for dataset_type in ['expert']:
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name)
+		env.reset()
 		# get the D4RL dataset
 		dataset = env.get_dataset()
 

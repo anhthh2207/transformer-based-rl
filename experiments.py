@@ -3,20 +3,9 @@ import argparse
 import torch
 from torch.nn import functional as F
 import numpy as np
-from skimage.color import rgb2gray
-from skimage.transform import resize
+from envi import AtariEnv
 
 from decision_transformer.dt_model import DecisionTransformer, GPTConfig
-
-def pre_processing(observe):
-    """ Preprocess the images
-        210*160*3(color) --> 84*84(mono)
-        float --> integer (to reduce the size of replay memory)
-    """
-
-    processed_observe = np.uint8(
-        resize(rgb2gray(observe), (84, 84), mode='constant') * 255)
-    return processed_observe / 255.
 
 def get_trajectory(trajectory, observation, action, reward, step):
     """ Collect observed trajectory from the environment.
@@ -73,6 +62,7 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
             _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
             probs = F.softmax(action_preds[0,-1], dim=-1)
             action = torch.multinomial(probs, num_samples=1)
+            # action = torch.argmax(probs).item()
     return action
 
 def experiment(variant, device):
@@ -84,14 +74,11 @@ def experiment(variant, device):
 
     # Initiate the environment
     if game == 'boxing':
-        env = gym.make('Boxing-v4')
-        env.observation_space.shape = (84, 84)  # resized gray-scale image
+        env = AtariEnv(game='Boxing')
     elif game == 'alien':
-        env = gym.make('Alien-v4')
-        env.observation_space.shape = (84, 84)  # resized gray-scale image
+        env = AtariEnv(game='Alien')
     elif game == 'breakout':
-        env = gym.make('Breakout-v4')
-        env.observation_space.shape = (84, 84)  # resized gray-scale image
+        env = AtariEnv(game='Breakout')
     else:
         raise NotImplementedError
     
@@ -120,7 +107,7 @@ def experiment(variant, device):
             model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
 
-    max_play = 5000 # maximum number of play steps
+    max_play = 1000 # maximum number of play steps
 
     trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
     step = 0
@@ -128,7 +115,6 @@ def experiment(variant, device):
     for i in range(max_play):
         action = make_action(trajectory, model, conf.context_len, device, model_type)
         observation, reward, terminated, info = env.step(action)
-        observation = pre_processing(observation)
         trajectory = get_trajectory(trajectory, observation, action, reward, step)
         step += 1
 
