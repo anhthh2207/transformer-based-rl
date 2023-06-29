@@ -19,7 +19,7 @@ datasets = []
 for env_name in ['breakout']:
 	for dataset_type in ['expert']:
 		name = f'{env_name}-{dataset_type}-v2'
-		env = gym.make(name)
+		env = gym.make(name, stack=True)
 		env.reset()
 		# get the D4RL dataset
 		dataset = env.get_dataset()
@@ -69,5 +69,5 @@ for env_name in ['breakout']:
 		print(f'Number of samples collected: {num_samples}')
 		print(f'Trajectory returns: mean = {np.mean(returns)}, std = {np.std(returns)}, max = {np.max(returns)}, min = {np.min(returns)}')
 
-		with open(f'{name}.pkl', 'wb') as f:
+		with open(f'{name}-stacked.pkl', 'wb') as f:
 			pickle.dump(paths, f)

@@ -30,7 +30,7 @@ def get_returns(rewards, model='decision_transformer', target_return = 90, rtg_s
             returns_to_go[i] = target_return - returns_to_go[i]
         return returns_to_go
 
-def make_action(trajectory, model, context_len, device, model_type='decision_transformer'):
+def make_action(trajectory, model, context_len, device, random=False, model_type='decision_transformer'):
     """ Given a state, return an action sampled from the model.
     """
 
@@ -61,8 +61,10 @@ def make_action(trajectory, model, context_len, device, model_type='decision_tra
         with torch.no_grad():
             _, action_preds, _ = model.forward(timesteps, states, actions, returns_to_go)
             probs = F.softmax(action_preds[0,-1], dim=-1)
-            action = torch.multinomial(probs, num_samples=1)
-            # action = torch.argmax(probs).item()
+            if random:
+                action = torch.multinomial(probs, num_samples=1)
+            else:
+                action = torch.argmax(probs, keepdim=True)
     return action
 
 def experiment(variant, device):
@@ -74,11 +76,11 @@ def experiment(variant, device):
 
     # Initiate the environment
     if game == 'boxing':
-        env = AtariEnv(game='Boxing')
+        env = AtariEnv(game='Boxing', stack=True)
     elif game == 'alien':
-        env = AtariEnv(game='Alien')
+        env = AtariEnv(game='Alien', stack=True)
     elif game == 'breakout':
-        env = AtariEnv(game='Breakout')
+        env = AtariEnv(game='Breakout', stack=True)
     else:
         raise NotImplementedError
     
@@ -113,15 +115,21 @@ def experiment(variant, device):
     step = 0
 
     for i in range(max_play):
-        action = make_action(trajectory, model, conf.context_len, device, model_type)
+        # if step < 30:
+        #     action = make_action(trajectory, model, conf.context_len, device, True, model_type)
+        # else:
+        #     action = make_action(trajectory, model, conf.context_len, device, False, model_type)
+        action = make_action(trajectory, model, conf.context_len, device, True, model_type)
+        print('Step:', step, 'Action:', action)
         observation, reward, terminated, info = env.step(action)
-        trajectory = get_trajectory(trajectory, observation, action, reward, step)
+        trajectory = get_trajectory(trajectory, observation/255., action, reward, step)
         step += 1
 
         env.render()
 
         if terminated:
-            print('Sum reward:', sum(trajectory['rewards']))
+            print("="*60)
+            print('Sum reward:', sum(trajectory['rewards']), 'in {} steps'.format(step))
             trajectory.clear()
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
             step = 0

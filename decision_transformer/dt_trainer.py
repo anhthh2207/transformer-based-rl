@@ -5,9 +5,12 @@ import numpy as np
 from torch.utils.data import DataLoader
 import gym
 import os
-from utils import D4RLTrajectoryDataset, set_seed
-from dt_model import DecisionTransformer, GPTConfig
 import argparse
+from tqdm import tqdm
+
+from utils import D4RLTrajectoryDataset, set_seed, AtariEnv
+from dt_model import DecisionTransformer, GPTConfig
+from dt_evaluation import get_trajectory, make_action
 
 class Trainer:
     def __init__(self, batch_size, lr, wt_decay, warmup_steps, max_epochs):
@@ -29,7 +32,6 @@ class Trainer:
 
         # training loop
         for epoch in range(self.max_epochs):
-            log_action_losses = []
             model.train()
 
             dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
@@ -38,8 +40,11 @@ class Trainer:
                                 shuffle=True, pin_memory=True,
                                 drop_last=True,
                                 num_workers=4) 
-
-            for _, (timesteps, states, actions, returns_to_go, traj_mask) in enumerate(loader):
+            print("="*60)
+            
+            losses = []
+            pbar = tqdm(enumerate(loader), total=len(loader))
+            for it, (timesteps, states, actions, returns_to_go, traj_mask) in pbar:
 
                 # reshape data before feeding to model
                 timesteps = timesteps.reshape(self.batch_size,conf.context_len).to(device)	# B x T
@@ -58,11 +63,13 @@ class Trainer:
                                                     returns_to_go=returns_to_go)
 
                 # only consider non padded elements
-                action_preds = action_preds.view(-1, act_dim)[traj_mask.view(-1,) > 0]
-                action_target = action_target.type(torch.float32).view(-1, act_dim)[traj_mask.view(-1,) > 0]
+                action_preds = action_preds.view(-1, act_dim)
+                action_target = action_target.type(torch.float32).view(-1, act_dim)
 
                 # cross-entropy loss for discrete action, mse for continuous action
                 action_loss = F.cross_entropy(action_preds, action_target)
+                loss = action_loss.mean()
+                losses.append(loss.item())
 
                 self.optimizer.zero_grad()
                 action_loss.backward()
@@ -70,20 +77,44 @@ class Trainer:
                 self.optimizer.step()
                 self.scheduler.step()
 
-                log_action_losses.append(action_loss.detach().cpu().item())
+                # update progress bar
+                pbar.set_description(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}")
+
                 total_updates += 1
 
-            mean_action_loss = np.mean(log_action_losses)
+            mean_action_loss = np.mean(losses)
 
-            log_str = ("=" * 60 + '\n' +
-                    "epoch: " + str(epoch) + '\n' +
-                    "num of updates: " + str(total_updates) + '\n' +
-                    "action loss: " +  format(mean_action_loss, ".5f")
-                    )
-            print(log_str)
+            # evaluate model
+            eval_reward = self.evaluate(model, conf, device)
+
+            print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, eval reward {eval_reward:.5f}, num of updates {total_updates}")
 
         # save model
         torch.save(model.state_dict(), save_model_path)
+    
+    def evaluate(self, model, conf, device):
+        model.eval()
+        env = AtariEnv(game='Breakout')
+        
+        cum_reward = 0
+        max_episodes = 10
+        for i in range(max_episodes):
+            env.reset()
+            trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+            sum_reward = 0
+            step = 0
+            while True:
+                action = make_action(trajectory, model, conf.context_len, device, random=True)
+                observation, reward, terminated, info = env.step(action)
+                trajectory = get_trajectory(trajectory, observation/255., action, reward, step)
+                step += 1
+                sum_reward += reward
+
+                if terminated:
+                    break
+            cum_reward += sum_reward
+        env.close()
+        return cum_reward/max_episodes
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

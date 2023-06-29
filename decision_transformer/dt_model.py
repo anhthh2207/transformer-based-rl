@@ -101,16 +101,15 @@ class DecisionTransformer(nn.Module):
 
         ### projection heads (project to embedding)
         self.embed_timestep = nn.Sequential(nn.Embedding(max_timestep, h_dim), nn.Tanh())
-        self.embed_rtg = nn.Sequential(nn.Linear(1*context_len, h_dim*context_len), nn.Tanh())
+        self.embed_rtg = nn.Sequential(nn.Linear(1, h_dim), nn.Tanh())
         
         # self.embed_state = nn.Linear(state_dim*context_len, h_dim*context_len)
         self.embed_state = nn.Sequential(
-                            nn.Conv2d(context_len, 32, 8, stride=4, padding=0), nn.ReLU(),
+                            nn.Conv2d(4, 32, 8, stride=4, padding=0), nn.ReLU(),
                             nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
                             nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU(),
                             nn.Flatten(), nn.Linear(3136, h_dim*context_len), nn.Tanh())
         
-        self.embed_action = nn.Sequential(nn.Embedding(act_dim, h_dim), nn.Tanh())
         use_action_tanh = False # False for discrete actions
 
         self.embed_ln = nn.LayerNorm(h_dim)
@@ -132,6 +131,9 @@ class DecisionTransformer(nn.Module):
         # init all weights
         self.apply(self._init_weights)
 
+        self.embed_action = nn.Sequential(nn.Embedding(act_dim, h_dim), nn.Tanh())
+        nn.init.normal_(self.embed_action[0].weight, mean=0.0, std=0.02)
+
         # report number of parameters (note we don't count the decoder parameters in lm_head)
         n_params = sum(p.numel() for p in self.transformer.parameters())
         print("number of parameters: %.2fM" % (n_params/1e6,))
@@ -146,6 +148,11 @@ class DecisionTransformer(nn.Module):
             module.weight.data.fill_(1.0)
 
     def forward(self, timesteps, states, actions, returns_to_go):
+        # states: (batch, block_size, 4*84*84)
+        # actions: (batch, block_size, 1)
+        # targets: (batch, block_size, 1)
+        # rtgs: (batch, block_size, 1)
+        # timesteps: (batch, 1, 1)
 
         B = states.shape[0] # batch size, context length, state_dim, state_dim
         T = timesteps.shape[1] # context length
