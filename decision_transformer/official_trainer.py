@@ -37,8 +37,8 @@ class Trainer:
             dataset = StackedData(dataset_path, context_len)
             loader = DataLoader(dataset,
                                 batch_size=self.batch_size,
-                                shuffle=True, pin_memory=True,
-                                num_workers=4) 
+                                shuffle=True) 
+                                # pin_memory=True, num_workers=4) 
             print("="*60)
             
             losses = []
@@ -46,14 +46,14 @@ class Trainer:
             for it, (timesteps, states, actions, returns_to_go) in pbar:
 
                 # reshape data before feeding to model
-                timesteps = timesteps.reshape(self.batch_size,1,1).to(device)	# B x T
+                timesteps = timesteps.reshape(self.batch_size,1,1).to(dtype=torch.int64, device=device)	# B x T
                 states = states.reshape(self.batch_size,context_len,4,state_dim,state_dim).to(dtype=torch.float32, device=device) # B x T x state_dim
-                actions = actions.reshape(self.batch_size,context_len,1).to(dtype=torch.float32, device=device)
+                actions = actions.reshape(self.batch_size,context_len,1).to(dtype=torch.long, device=device)
                 returns_to_go = returns_to_go.reshape(self.batch_size,context_len,1).to(device) # B x 1 x 1
 
                 logits, loss = model.forward(states = states,
                                             actions = actions,
-                                            target = actions,
+                                            targets = actions,
                                             rtgs = returns_to_go,
                                             timesteps = timesteps)
                 loss = loss.mean()
@@ -137,7 +137,6 @@ if __name__ == "__main__":
     save_model_name =  prefix + "_stacked_model" + ".pt"
     save_model_path = os.path.join(log_dir, save_model_name)
 
-    print("=" * 60)
     print("device set to: " + str(device))
     print("dataset path: " + dataset_path)
     print("model save path: " + save_model_path)

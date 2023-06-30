@@ -138,11 +138,11 @@ def make_action(trajectory, model, context_len, device, random=True):
         states = states.reshape(1,context_len,4,state_dim,state_dim).to(device)
         actions = torch.from_numpy(actions).long().reshape(1,context_len,1).to(device)
         returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len,1).to(device)
-        timesteps = torch.LongTensor(timesteps).reshape(1,1).to(device)
+        timesteps = torch.tensor(timesteps, dtype=torch.int64).reshape(1,1).to(device)
         with torch.no_grad():
             logits, _ = model.forward(states = states,
                                     actions = actions,
-                                    target = None,
+                                    targets = None,
                                     rtgs = returns_to_go,
                                     timesteps = timesteps)
             probs = F.softmax(logits[:, -1, :], dim=-1)
