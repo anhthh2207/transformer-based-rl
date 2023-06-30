@@ -91,7 +91,7 @@ class Block(nn.Module):
 
 class DecisionTransformer(nn.Module):
     def __init__(self, state_dim, act_dim, n_blocks, h_dim, context_len, 
-                 n_heads, drop_p, max_timestep=1000):
+                 n_heads, drop_p, max_timestep=10000):
         super().__init__()
 
         self.state_dim = state_dim
@@ -100,7 +100,10 @@ class DecisionTransformer(nn.Module):
         self.context_len = context_len
 
         ### projection heads (project to embedding)
-        self.embed_timestep = nn.Sequential(nn.Embedding(max_timestep, h_dim), nn.Tanh())
+        # self.embed_timestep = nn.Sequential(nn.Embedding(max_timestep, h_dim), nn.Tanh())
+        self.pos_emb = nn.Parameter(torch.zeros(1, context_len + 1, h_dim))
+        self.global_pos_emb = nn.Parameter(torch.zeros(1, max_timestep+1, h_dim))
+
         self.embed_rtg = nn.Sequential(nn.Linear(1, h_dim), nn.Tanh())
         
         # self.embed_state = nn.Linear(state_dim*context_len, h_dim*context_len)
@@ -149,10 +152,11 @@ class DecisionTransformer(nn.Module):
 
     def forward(self, timesteps, states, actions, returns_to_go):
         # states: (batch, block_size, 4*84*84)
-        # actions: (batch, block_size, 1)
-        # targets: (batch, block_size, 1)
-        # rtgs: (batch, block_size, 1)
-        # timesteps: (batch, 1, 1)
+        # actions: (batch, block_size)
+        # targets: (batch, block_size)
+        # rtgs: (batch, block_size)
+        # timesteps: (batch, block_size)
+        # TODO: add targets, modify embedding matrices, integrate loss function, delete states, returns heads
 
         B = states.shape[0] # batch size, context length, state_dim, state_dim
         T = timesteps.shape[1] # context length
