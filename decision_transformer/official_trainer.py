@@ -33,8 +33,8 @@ class Trainer:
         # training loop
         for epoch in range(self.max_epochs):
             model.train()
-
-            dataset = StackedData(dataset_path, conf.context_len)
+            context_len = conf.block_size//3
+            dataset = StackedData(dataset_path, context_len)
             loader = DataLoader(dataset,
                                 batch_size=self.batch_size,
                                 shuffle=True, pin_memory=True,
@@ -48,9 +48,9 @@ class Trainer:
 
                 # reshape data before feeding to model
                 timesteps = timesteps.reshape(self.batch_size,1,1).to(device)	# B x T
-                states = states.reshape(self.batch_size,conf.context_len,4,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device) # B x T x state_dim
-                actions = actions.reshape(self.batch_size,conf.context_len,1).to(dtype=torch.float32, device=device)
-                returns_to_go = returns_to_go.reshape(self.batch_size,conf.context_len,1).to(device) # B x 1 x 1
+                states = states.reshape(self.batch_size,context_len,4,state_dim,state_dim).to(dtype=torch.float32, device=device) # B x T x state_dim
+                actions = actions.reshape(self.batch_size,context_len,1).to(dtype=torch.float32, device=device)
+                returns_to_go = returns_to_go.reshape(self.batch_size,context_len,1).to(device) # B x 1 x 1
 
                 logits, loss = model.forward(states = states,
                                             actions = actions,
@@ -74,7 +74,7 @@ class Trainer:
             mean_action_loss = np.mean(losses)
 
             # evaluate model
-            eval_reward = self.evaluate(model, conf, device)
+            eval_reward = self.evaluate(model, context_len)
 
             print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, average eval reward {eval_reward:.5f}, num of updates {total_updates}")
             
@@ -84,7 +84,7 @@ class Trainer:
         print("finished training!")
         print("saved model at: " + f"epoch_{self.max_epochs+1}_" + save_model_path)
     
-    def evaluate(self, model, conf, device):
+    def evaluate(self, model, context_len):
         model.eval()
         env = AtariEnv(game='Breakout', stack=True)
         
@@ -96,7 +96,7 @@ class Trainer:
             sum_reward = 0
             step = 0
             while True:
-                action = make_action(trajectory, model, conf.context_len, device, random=True)
+                action = make_action(trajectory, model, context_len, device, random=True)
                 observation, reward, terminated, info = env.step(action)
                 observation = np.array(observation) / 255.
                 trajectory = get_trajectory(trajectory, observation, action, reward, step)
