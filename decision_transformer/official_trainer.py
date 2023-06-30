@@ -38,7 +38,6 @@ class Trainer:
             loader = DataLoader(dataset,
                                 batch_size=self.batch_size,
                                 shuffle=True, pin_memory=True,
-                                drop_last=True,
                                 num_workers=4) 
             print("="*60)
             
