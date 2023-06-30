@@ -37,7 +37,7 @@ class Trainer:
             dataset = StackedData(dataset_path, context_len)
             loader = DataLoader(dataset,
                                 batch_size=self.batch_size,
-                                shuffle=True) 
+                                shuffle=True, drop_last=True) 
                                 # pin_memory=True, num_workers=4) 
             print("="*60)
             
@@ -75,13 +75,13 @@ class Trainer:
             # evaluate model
             eval_reward = self.evaluate(model, context_len)
 
-            print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, average eval reward {eval_reward:.5f}, num of updates {total_updates}")
+            print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, average eval reward {eval_reward:.2f}, num of updates {total_updates}")
             
-            torch.save(model.state_dict(), f"epoch_{epoch+1}_" + save_model_path)
+            torch.save(model.state_dict(), save_model_path[:-3] + f"_epoch{epoch+1}.pt")
 
         print("=" * 60)
         print("finished training!")
-        print("saved model at: " + f"epoch_{self.max_epochs+1}_" + save_model_path)
+        print("saved model at: " + save_model_path[:-3] + f"_epoch{self.max_epochs}.pt")
     
     def evaluate(self, model, context_len):
         model.eval()
@@ -102,7 +102,7 @@ class Trainer:
                 step += 1
                 sum_reward += reward
 
-                if terminated:
+                if terminated or step >= 10000:
                     break
             cum_reward += sum_reward
         env.close()

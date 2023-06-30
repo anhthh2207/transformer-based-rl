@@ -59,7 +59,7 @@ class StackedData(Dataset):
                     padding = True
                 break
 
-        timesteps = torch.from_numpy(self.timesteps[idx : idx + 1])
+        timesteps = torch.tensor(self.timesteps[idx])
         
         if padding == False:
 
@@ -117,7 +117,7 @@ def make_action(trajectory, model, context_len, device, random=True):
     """
 
     if len(trajectory['observations']) == 0:
-        action = np.random.randint(0, model.act_dim)
+        action = np.random.randint(0, 3)
     else:
         state_dim = 84
         states = torch.zeros((context_len, 4, state_dim, state_dim))
@@ -138,7 +138,7 @@ def make_action(trajectory, model, context_len, device, random=True):
         states = states.reshape(1,context_len,4,state_dim,state_dim).to(device)
         actions = torch.from_numpy(actions).long().reshape(1,context_len,1).to(device)
         returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len,1).to(device)
-        timesteps = torch.tensor(timesteps, dtype=torch.int64).reshape(1,1).to(device)
+        timesteps = torch.tensor(timesteps, dtype=torch.int64).reshape(1,1,1).to(device)
         with torch.no_grad():
             logits, _ = model.forward(states = states,
                                     actions = actions,

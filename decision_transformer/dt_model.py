@@ -150,7 +150,7 @@ class DecisionTransformer(nn.Module):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
-    def forward(self, timesteps, states, actions, returns_to_go):
+    def forward(self, timesteps, states, actions, targets, returns_to_go):
         # states: (batch, block_size, 4*84*84)
         # actions: (batch, block_size)
         # targets: (batch, block_size)
@@ -194,4 +194,8 @@ class DecisionTransformer(nn.Module):
     
         # In the original paper, it is stated that predicting the states and returns are not necessary
         # and does not improve the performance. However, it could be an interesting study for future work.
-        return state_preds, action_preds, return_preds
+        logits = action_preds
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(logits.reshape(-1, self.act_dim), targets.reshape(-1))
+        return logits, loss
