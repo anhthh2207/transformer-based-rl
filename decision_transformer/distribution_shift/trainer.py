@@ -84,7 +84,7 @@ class Trainer:
     
     def evaluate(self, model, context_len):
         model.eval()
-        env = AtariEnv(game='SpaceInvaders', stack=False)
+        env = AtariEnv(game='StarGunner', stack=False)
         
         cum_reward = 0
         max_episodes = 5
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=123)
     parser.add_argument('--epochs', type=int, default=5)
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--batch_size', type=int, default=512)
     parser.add_argument('--lr', type=int, default=6e-4)
     parser.add_argument('--wt_decay', type=int, default=0.1)
     parser.add_argument('--warmup_steps', type=int, default=512*20)
@@ -147,7 +147,7 @@ if __name__ == "__main__":
     state_dim = 84
     act_dim = 6
 
-    conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
+    conf = GPTConfig(vocab_size=act_dim, n_layer=12, n_head=12, n_embd=256, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     
     # start training    
