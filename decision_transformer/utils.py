@@ -50,8 +50,6 @@ class D4RLTrajectoryDataset(Dataset):
             terminal_idx = self.terminal_idxs[-1] + traj_len
             self.terminal_idxs.append(terminal_idx)
         
-        print('Max return-to-go in the dataset:', np.max(self.rtg))
-
     def __len__(self):
         return self.states.shape[0]
 

@@ -20,7 +20,7 @@ def get_trajectory(trajectory, observation, action, reward, step):
 
     return trajectory
 
-def get_returns(rewards, target_return = 90):
+def get_returns(rewards, target_return = 200):
     """ Calculate the returns to go.
     """
 

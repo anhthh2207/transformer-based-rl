@@ -49,7 +49,7 @@ class Trainer:
                 # reshape data before feeding to model
                 timesteps = timesteps.reshape(self.batch_size,conf.context_len).to(device)
                 states = states.reshape(self.batch_size,conf.context_len,4,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)
-                actions = actions.reshape(self.batch_size,conf.context_len).to(dtype=torch.float32, device=device)
+                actions = actions.reshape(self.batch_size,conf.context_len).to(dtype=torch.long, device=device)
                 returns_to_go = returns_to_go.reshape(self.batch_size,conf.context_len).to(device)
 
                 _, loss = model.forward(timesteps=timesteps,
@@ -145,7 +145,6 @@ if __name__ == "__main__":
     save_model_name =  prefix + "_stacked_model" + ".pt"
     save_model_path = os.path.join(log_dir, save_model_name)
 
-    print("=" * 60)
     print("device set to: " + str(device))
     print("dataset path: " + dataset_path)
     print("model save path: " + save_model_path)
