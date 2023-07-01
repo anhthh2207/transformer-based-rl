@@ -84,7 +84,7 @@ def experiment(device):
     conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     # Load the trained weights
-    path_to_model = "dt_runs/dt_breakout-expert-v2_model-stacked.pt"
+    path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model.pt"
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(path_to_model))
     else:

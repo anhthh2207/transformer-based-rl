@@ -74,9 +74,6 @@ class D4RLTrajectoryDataset(Dataset):
             returns_to_go = torch.from_numpy(self.rtg[idx : idx + self.context_len])
             timesteps = torch.from_numpy(self.timesteps[idx : idx + self.context_len])
 
-            # all ones since no padding
-            traj_mask = torch.ones(self.context_len, dtype=torch.long)
-
         else:
             padding_len = self.context_len - non_padding_len
 
@@ -96,12 +93,8 @@ class D4RLTrajectoryDataset(Dataset):
             timesteps = torch.from_numpy(self.timesteps[idx : idx + non_padding_len])
             timesteps = torch.cat([torch.zeros(([padding_len] + list(timesteps.shape[1:])), dtype=timesteps.dtype), timesteps], 
                                  dim=0)
-
-            traj_mask = torch.cat([torch.zeros(padding_len, dtype=torch.long),
-                                   torch.ones(non_padding_len, dtype=torch.long)], 
-                                  dim=0)
             
-        return  timesteps, states.squeeze(), actions, returns_to_go, traj_mask
+        return  timesteps, states.squeeze(), actions, returns_to_go
     
 class AtariEnv(gym.Env):
     def __init__(self,

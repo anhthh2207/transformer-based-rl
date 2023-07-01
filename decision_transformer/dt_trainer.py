@@ -44,35 +44,25 @@ class Trainer:
             
             losses = []
             pbar = tqdm(enumerate(loader), total=len(loader))
-            for it, (timesteps, states, actions, returns_to_go, traj_mask) in pbar:
+            for it, (timesteps, states, actions, returns_to_go) in pbar:
 
                 # reshape data before feeding to model
-                timesteps = timesteps.reshape(self.batch_size,conf.context_len).to(device)	# B x T
-                states = states.reshape(self.batch_size,conf.context_len,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)			# B x T x state_dim
-                actions = actions.reshape(self.batch_size,conf.context_len).to(dtype=torch.float32, device=device)		# B x T x act_dim
-                returns_to_go = returns_to_go.reshape(self.batch_size,conf.context_len).to(device) # B x T x 1
-                traj_mask = traj_mask.reshape(self.batch_size,conf.context_len).to(device)	# B x T
+                timesteps = timesteps.reshape(self.batch_size,conf.context_len).to(device)
+                states = states.reshape(self.batch_size,conf.context_len,4,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)
+                actions = actions.reshape(self.batch_size,conf.context_len).to(dtype=torch.float32, device=device)
+                returns_to_go = returns_to_go.reshape(self.batch_size,conf.context_len).to(device)
 
-                # ground truth actions
-                action_target = torch.clone(actions).detach().to(device)
-                action_target = torch.nn.functional.one_hot(action_target.to(torch.int64), conf.act_dim)
+                _, loss = model.forward(timesteps=timesteps,
+                                        states=states,
+                                        actions=actions,
+                                        targets=actions,
+                                        returns_to_go=returns_to_go)
 
-                _, action_preds, _ = model.forward(timesteps=timesteps,
-                                                    states=states,
-                                                    actions=actions,
-                                                    returns_to_go=returns_to_go)
-
-                # only consider non padded elements
-                action_preds = action_preds.view(-1, act_dim)
-                action_target = action_target.type(torch.float32).view(-1, act_dim)
-
-                # cross-entropy loss for discrete action, mse for continuous action
-                action_loss = F.cross_entropy(action_preds, action_target)
-                loss = action_loss.mean()
+                loss = loss.mean()
                 losses.append(loss.item())
 
                 self.optimizer.zero_grad()
-                action_loss.backward()
+                loss.backward()
                 nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                 self.optimizer.step()
                 self.scheduler.step()
@@ -94,23 +84,30 @@ class Trainer:
     
     def evaluate(self, model, conf, device):
         model.eval()
-        env = AtariEnv(game='Breakout')
+        env = AtariEnv(game='Breakout', stack=True)
         
         cum_reward = 0
         max_episodes = 10
         for i in range(max_episodes):
-            env.reset()
+            # initiate environment
+            observation, info = env.reset(seed=args.seed)
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+            trajectory['observations'].append(observation)
+            trajectory['steps'].append(0)
+            trajectory['rewards'].append(0)
+
+            # run episode
             sum_reward = 0
             step = 0
             while True:
-                action = make_action(trajectory, model, conf.context_len, device, random=True)
+                action = make_action(trajectory, model, conf.context_len, device)
                 observation, reward, terminated, info = env.step(action)
-                trajectory = get_trajectory(trajectory, observation/255., action, reward, step)
+                observation = np.array(observation) / 255.
+                trajectory = get_trajectory(trajectory, observation, action, reward, step)
                 step += 1
                 sum_reward += reward
 
-                if terminated:
+                if terminated or step >= 10000:
                     break
             cum_reward += sum_reward
         env.close()
@@ -135,14 +132,14 @@ if __name__ == "__main__":
     env_d4rl_name = f'breakout-{dataset}-v2'
 
     # dataset path
-    dataset_path = '../data/' + env_d4rl_name + '.pkl'
+    dataset_path = '../data/' + env_d4rl_name + '-stacked.pkl'
 
     # model saving directory
     log_dir = "./dt_runs/"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     prefix = "dt_" + env_d4rl_name
-    save_model_name =  prefix + "_model" + ".pt"
+    save_model_name =  prefix + "_stacked_model" + ".pt"
     save_model_path = os.path.join(log_dir, save_model_name)
 
     print("=" * 60)
