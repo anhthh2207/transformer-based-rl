@@ -8,8 +8,8 @@ import os
 import argparse
 from tqdm import tqdm
 
-from utils import D4RLTrajectoryDataset, set_seed, AtariEnv, get_trajectory, make_action
-from dt_model import DecisionTransformer, GPTConfig
+from utils import set_seed, AtariEnv, StackedData, get_trajectory, make_action
+from model import GPT, GPTConfig
 
 class Trainer:
     def __init__(self, batch_size, lr, wt_decay, warmup_steps, max_epochs):
@@ -32,13 +32,12 @@ class Trainer:
         # training loop
         for epoch in range(self.max_epochs):
             model.train()
-
-            dataset = D4RLTrajectoryDataset(dataset_path, conf.context_len)
+            context_len = conf.block_size//3
+            dataset = StackedData(dataset_path, context_len)
             loader = DataLoader(dataset,
                                 batch_size=self.batch_size,
-                                shuffle=True, pin_memory=True,
-                                drop_last=True,
-                                num_workers=4) 
+                                shuffle=True, drop_last=True) 
+                                # pin_memory=True, num_workers=4) 
             print("="*60)
             
             losses = []
@@ -46,17 +45,16 @@ class Trainer:
             for it, (timesteps, states, actions, returns_to_go) in pbar:
 
                 # reshape data before feeding to model
-                timesteps = timesteps.reshape(self.batch_size,conf.context_len).to(device)
-                states = states.reshape(self.batch_size,conf.context_len,4,conf.state_dim,conf.state_dim).to(dtype=torch.float32, device=device)
-                actions = actions.reshape(self.batch_size,conf.context_len).to(dtype=torch.long, device=device)
-                returns_to_go = returns_to_go.reshape(self.batch_size,conf.context_len).to(device)
+                timesteps = timesteps.reshape(self.batch_size,1,1).to(dtype=torch.int64, device=device)	# B x T
+                states = states.reshape(self.batch_size,context_len,1,state_dim,state_dim).to(dtype=torch.float32, device=device) # B x T x state_dim
+                actions = actions.reshape(self.batch_size,context_len,1).to(dtype=torch.long, device=device)
+                returns_to_go = returns_to_go.reshape(self.batch_size,context_len,1).to(device) # B x 1 x 1
 
-                _, loss = model.forward(timesteps=timesteps,
-                                        states=states,
-                                        actions=actions,
-                                        targets=actions,
-                                        rtgs=returns_to_go)
-
+                logits, loss = model.forward(states = states,
+                                            actions = actions,
+                                            targets = actions,
+                                            rtgs = returns_to_go,
+                                            timesteps = timesteps)
                 loss = loss.mean()
                 losses.append(loss.item())
 
@@ -74,24 +72,27 @@ class Trainer:
             mean_action_loss = np.mean(losses)
 
             # evaluate model
-            eval_reward = self.evaluate(model, conf, device)
+            eval_reward = self.evaluate(model, context_len)
 
-            print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, eval reward {eval_reward:.5f}, num of updates {total_updates}")
+            print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, average eval reward {eval_reward:.2f}, num of updates {total_updates}")
+            
+            torch.save(model.state_dict(), save_model_path[:-3] + f"_epoch{epoch+1}.pt")
 
-        # save model
-        torch.save(model.state_dict(), save_model_path[:-3] + f"_epoch{epoch+1}.pt")
+        print("=" * 60)
+        print("finished training!")
+        print("saved model at: " + save_model_path[:-3] + f"_epoch{self.max_epochs}.pt")
     
-    def evaluate(self, model, conf, device):
+    def evaluate(self, model, context_len):
         model.eval()
-        env = AtariEnv(game='Breakout', stack=True)
+        env = AtariEnv(game='Breakout', stack=False)
         
         cum_reward = 0
-        max_episodes = 10
+        max_episodes = 5
         for i in range(max_episodes):
             # init environment
             env.reset()
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
-            action = make_action(trajectory, model, conf.context_len, device)
+            action = make_action(trajectory, model, context_len, device)
             observation, reward, terminated, info = env.step(action)
             observation = np.array(observation) / 255.
             trajectory['observations'].append(observation)
@@ -102,7 +103,7 @@ class Trainer:
             step = 1
             sum_reward = 0
             while True:
-                action = make_action(trajectory, model, conf.context_len, device)
+                action = make_action(trajectory, model, context_len, device)
                 observation, reward, terminated, info = env.step(action)
                 observation = np.array(observation) / 255.
                 trajectory = get_trajectory(trajectory, observation, action, reward, step)
@@ -129,15 +130,15 @@ if __name__ == "__main__":
     device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"
 
     # dataset path
-    env_d4rl_name = 'breakout-expert-v2'
-    dataset_path = '../data/' + env_d4rl_name + '-stacked.pkl'
+    env_d4rl_name = f'breakout-expert-v2'
+    dataset_path = '../../data/' + env_d4rl_name + '.pkl'
 
     # model saving directory
     log_dir = "./dt_runs/"
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     prefix = "dt_" + env_d4rl_name
-    save_model_name =  prefix + "_stacked_model" + ".pt"
+    save_model_name =  prefix + "_model" + ".pt"
     save_model_path = os.path.join(log_dir, save_model_name)
 
     print("device set to: " + str(device))
@@ -145,25 +146,12 @@ if __name__ == "__main__":
     print("model save path: " + save_model_path)
 
     # model and training config
-    env = gym.make(env_name)
     state_dim = 84
-    act_dim = env.action_space.n # 4
+    act_dim = 4
 
-    conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
-
-    model = DecisionTransformer(state_dim=conf.state_dim,
-							act_dim=conf.act_dim,
-							n_blocks=conf.n_blocks,
-							h_dim=conf.embed_dim,
-							context_len=conf.context_len,
-							n_heads=conf.n_heads,
-							drop_p=conf.dropout_p).to(device)
+    conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
+    model = GPT(conf).to(device)
     
     # start training    
     trainer = Trainer(args.batch_size, args.lr, args.wt_decay, args.warmup_steps, args.epochs)
     trainer.train(model, dataset_path, conf, device)
-
-    print("=" * 60)
-    print("finished training!")
-    print("saved model at: " + save_model_path)
-    print("=" * 60)
