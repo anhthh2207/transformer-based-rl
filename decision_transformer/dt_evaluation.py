@@ -41,13 +41,13 @@ def make_action(trajectory, model, context_len, device):
         state_dim = 84
         if len(trajectory['observations']) < context_len:
             context_len = len(trajectory['observations'])
-            states = torch.tensor(trajectory['observations'], dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][0], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
             rtgs = torch.tensor(rewards).reshape(1, context_len, 1).to(device)
         else:
-            states = torch.tensor(trajectory['observations'][-context_len:], dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][-context_len], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
@@ -84,7 +84,7 @@ def experiment(device):
     conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     # Load the trained weights
-    path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model.pt"
+    path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model_5.pt"
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(path_to_model))
     else:
@@ -96,16 +96,19 @@ def experiment(device):
     cum_reward = 0
 
     for i in range(max_episodes):
-        observation, info = env.reset()
+        env.reset()
         trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+        action = make_action(trajectory, model, 30, device)
+        observation, reward, terminated, info = env.step(action)
+        observation = np.array(observation) / 255.
         trajectory['observations'].append(observation)
+        trajectory['rewards'].append(reward)
         trajectory['steps'].append(0)
-        trajectory['rewards'].append(0)
         
-        step = 0
+        step = 1
         sum_reward = 0
         while True:
-            action = make_action(trajectory, model, conf.context_len, device)
+            action = make_action(trajectory, model, 30, device)
             observation, reward, terminated, info = env.step(action)
             observation = np.array(observation) / 255.
             trajectory = get_trajectory(trajectory, observation, action, reward, step)
@@ -121,7 +124,7 @@ def experiment(device):
     env.close()
     print("=" * 60)
     print("Cum reward:", cum_reward, "out of", max_episodes, "episodes")
-    print("Average reward:", sum_reward/max_episodes)
+    print("Average reward:", cum_reward/max_episodes)
 
 if __name__ == '__main__':
     device = torch.cuda.current_device() if torch.cuda.is_available() else "cpu"

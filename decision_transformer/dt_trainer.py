@@ -80,7 +80,7 @@ class Trainer:
             print(f"epoch {epoch+1}: train loss {mean_action_loss:.5f}, eval reward {eval_reward:.5f}, num of updates {total_updates}")
 
         # save model
-        torch.save(model.state_dict(), save_model_path)
+        torch.save(model.state_dict(), save_model_path[:-3] + f"_epoch{epoch+1}.pt")
     
     def evaluate(self, model, conf, device):
         model.eval()
@@ -89,16 +89,19 @@ class Trainer:
         cum_reward = 0
         max_episodes = 10
         for i in range(max_episodes):
-            # initiate environment
-            observation, info = env.reset(seed=args.seed)
+            # init environment
+            env.reset(seed=args.seed)
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+            action = make_action(trajectory, model, conf.context_len, device)
+            observation, reward, terminated, info = env.step(action)
+            observation = np.array(observation) / 255.
             trajectory['observations'].append(observation)
+            trajectory['rewards'].append(reward)
             trajectory['steps'].append(0)
-            trajectory['rewards'].append(0)
-
-            # run episode
+            
+            # run episodes
+            step = 1
             sum_reward = 0
-            step = 0
             while True:
                 action = make_action(trajectory, model, conf.context_len, device)
                 observation, reward, terminated, info = env.step(action)
