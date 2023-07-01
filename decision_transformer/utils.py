@@ -1,4 +1,5 @@
 import torch
+from torch.nn import functional as F
 import pickle
 import random
 import numpy as np
@@ -132,3 +133,57 @@ class AtariEnv(gym.Env):
     def seed(self, seed=None):
         super().seed(seed)
         self._env.seed(seed)
+
+def get_trajectory(trajectory, observation, action, reward, step):
+    """ Collect observed trajectory from the environment.
+    """
+
+    trajectory['observations'].append(observation)
+    trajectory['actions'].append(action)
+    trajectory['rewards'].append(reward)
+    trajectory['steps'].append(step)
+
+    return trajectory
+
+def get_returns(rewards, target_return = 200):
+    """ Calculate the returns to go.
+    """
+
+    returns_to_go = np.zeros(len(rewards))
+    for i in range(len(rewards)):
+        for j in range(i):
+            returns_to_go[i] += rewards[j]
+        returns_to_go[i] = target_return - returns_to_go[i]
+    return returns_to_go
+
+def make_action(trajectory, model, context_len, device):
+    """ Given a state, return an action sampled from the model.
+    """
+
+    if len(trajectory['observations']) == 0:
+        action = np.random.randint(0, 3)
+    else:
+        state_dim = 84
+        if len(trajectory['observations']) < context_len:
+            context_len = len(trajectory['observations'])
+            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            actions = torch.tensor(trajectory['actions'], dtype=torch.long).reshape(1, context_len-1).to(device)   # the action to the current state needs to be predicted
+            timesteps = torch.tensor(trajectory['steps'][:], dtype=torch.int64).reshape(1,context_len).to(device)
+            rewards = get_returns(trajectory['rewards'])
+            rtgs = torch.tensor(rewards).reshape(1, context_len).to(device)
+        else:
+            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1).to(device)   # the action to the current state needs to be predicted
+            timesteps = torch.tensor(trajectory['steps'][-context_len:], dtype=torch.int64).reshape(1,context_len).to(device)
+            rewards = get_returns(trajectory['rewards'])
+            rtgs = torch.tensor(rewards[-context_len:]).reshape(1, context_len).to(device)
+            
+        with torch.no_grad():
+            logits, _ = model.forward(states = states,
+                                    actions = actions,
+                                    targets = None,
+                                    rtgs = rtgs,
+                                    timesteps = timesteps)
+            probs = F.softmax(logits[:, -1, :], dim=-1)
+            action = torch.multinomial(probs, num_samples=1)
+    return action

@@ -8,9 +8,8 @@ import os
 import argparse
 from tqdm import tqdm
 
-from utils import D4RLTrajectoryDataset, set_seed, AtariEnv
+from utils import D4RLTrajectoryDataset, set_seed, AtariEnv, get_trajectory, make_action
 from dt_model import DecisionTransformer, GPTConfig
-from dt_evaluation import get_trajectory, make_action
 
 class Trainer:
     def __init__(self, batch_size, lr, wt_decay, warmup_steps, max_epochs):
@@ -90,7 +89,7 @@ class Trainer:
         max_episodes = 10
         for i in range(max_episodes):
             # init environment
-            env.reset(seed=args.seed)
+            env.reset()
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
             action = make_action(trajectory, model, conf.context_len, device)
             observation, reward, terminated, info = env.step(action)

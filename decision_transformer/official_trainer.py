@@ -91,7 +91,7 @@ class Trainer:
         max_episodes = 10
         for i in range(max_episodes):
             # init environment
-            env.reset(seed=args.seed)
+            env.reset()
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
             action = make_action(trajectory, model, context_len, device)
             observation, reward, terminated, info = env.step(action)

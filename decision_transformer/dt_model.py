@@ -144,7 +144,7 @@ class DecisionTransformer(nn.Module):
             module.bias.data.zero_()
             module.weight.data.fill_(1.0)
 
-    def forward(self, timesteps, states, actions, targets, returns_to_go):
+    def forward(self, timesteps, states, actions, targets, rtgs):
         # states: (batch, block_size, 4*84*84)
         # actions: (batch, block_size)
         # targets: (batch, block_size)
@@ -158,16 +158,16 @@ class DecisionTransformer(nn.Module):
 
         # time embeddings are treated similar to positional embeddings
         state_embeddings = self.embed_state(states.reshape(B*T,4,84,84).type(torch.float32))
-        state_embeddings = state_embeddings.reshape(B, T, self.h_dim) + time_embeddings
-        action_embeddings = self.embed_action(actions.type(torch.long)).reshape(B, T - int(targets is None), self.h_dim) + time_embeddings
-        returns_embeddings = self.embed_rtg(returns_to_go.reshape(B,T,1).type(torch.float32)).reshape(B, T, self.h_dim) + time_embeddings
+        state_embeddings = state_embeddings.reshape(B, T, self.h_dim)
+        action_embeddings = self.embed_action(actions.type(torch.long)).reshape(B, T - int(targets is None), self.h_dim)
+        returns_embeddings = self.embed_rtg(rtgs.reshape(B,T,1).type(torch.float32)).reshape(B, T, self.h_dim)
 
         # stack rtg, states and actions and reshape sequence as
         # (r1, s1, a1, r2, s2, a2 ...)
         x = torch.zeros(B, 3 * T - int(targets is None), self.h_dim, device=states.device)
-        x[:,0::3,:] = returns_embeddings
-        x[:,1::3,:] = state_embeddings
-        x[:,2::3,:] = action_embeddings
+        x[:,0::3,:] = returns_embeddings + time_embeddings
+        x[:,1::3,:] = state_embeddings + time_embeddings
+        x[:,2::3,:] = action_embeddings + time_embeddings[:,:T - int(targets is None),:]
 
         x = self.embed_ln(x)
         
