@@ -125,11 +125,7 @@ class DecisionTransformer(nn.Module):
         ))
 
         ### prediction heads
-        self.predict_rtg = torch.nn.Linear(h_dim, 1)
-        self.predict_state = torch.nn.Linear(h_dim, state_dim*state_dim)
-        self.predict_action = nn.Sequential(
-            *([nn.Linear(h_dim, act_dim)] + ([nn.Tanh()] if use_action_tanh else []))
-        )
+        self.predict_action = nn.Linear(h_dim, act_dim, bias=False)
 
         # init all weights
         self.apply(self._init_weights)
@@ -156,7 +152,6 @@ class DecisionTransformer(nn.Module):
         # targets: (batch, block_size)
         # rtgs: (batch, block_size)
         # timesteps: (batch, block_size)
-        # TODO: add targets, modify embedding matrices, integrate loss function, delete states, returns heads
 
         B = states.shape[0] # batch size, context length, state_dim, state_dim
         T = timesteps.shape[1] # context length
@@ -165,14 +160,15 @@ class DecisionTransformer(nn.Module):
 
         # time embeddings are treated similar to positional embeddings
         state_embeddings = self.embed_state(states.type(torch.float32)).reshape(B, T, self.h_dim) + time_embeddings
-        action_embeddings = self.embed_action(actions.type(torch.long)).reshape(B, T, self.h_dim) + time_embeddings
+        action_embeddings = self.embed_action(actions.type(torch.long)).reshape(B, T - int(targets is None), self.h_dim) + time_embeddings
         returns_embeddings = self.embed_rtg(returns_to_go.type(torch.float32)).reshape(B, T, self.h_dim) + time_embeddings
 
         # stack rtg, states and actions and reshape sequence as
         # (r1, s1, a1, r2, s2, a2 ...)
-        x = torch.stack(
-            (returns_embeddings, state_embeddings, action_embeddings), dim=1
-        ).reshape(B, 3 * T, self.h_dim) # (B, 3 * T, h_dim)
+        x = torch.zeros(B, 3 * T - int(targets is None), self.h_dim, device=states.device)
+        x[:,0::3,:] = returns_embeddings
+        x[:,1::3,:] = state_embeddings
+        x[:,2::3,:] = action_embeddings
 
         x = self.embed_ln(x)
         
@@ -181,20 +177,12 @@ class DecisionTransformer(nn.Module):
             x = block(x)
         h = self.transformer.ln_f(x)
 
-        # get h reshaped such that its size = (B x 3 x T x h_dim) and
-        # h[:, 0, t] is conditioned on r_0, s_0, a_0 ... r_t
-        # h[:, 1, t] is conditioned on r_0, s_0, a_0 ... r_t, s_t
-        # h[:, 2, t] is conditioned on r_0, s_0, a_0 ... r_t, s_t, a_t
-        h = h.reshape(B, T, 3, self.h_dim).permute(0, 2, 1, 3)
-
         # get predictions
-        return_preds = self.predict_rtg(h[:,2])     # predict next rtg given r, s, a
-        state_preds = self.predict_state(h[:,2]).reshape(B, T, self.state_dim, self.state_dim)    # predict next state given r, s, a
-        action_preds = self.predict_action(h[:,1])  # predict action given r, s
+        action_preds = self.predict_action(h)
+        logits = action_preds[:, 1::3, :] # take only prediction based on states and returns
     
         # In the original paper, it is stated that predicting the states and returns are not necessary
         # and does not improve the performance. However, it could be an interesting study for future work.
-        logits = action_preds
         loss = None
         if targets is not None:
             loss = F.cross_entropy(logits.reshape(-1, self.act_dim), targets.reshape(-1))

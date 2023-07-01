@@ -84,10 +84,6 @@ class StackedData(Dataset):
             returns_to_go = torch.cat([torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype), returns_to_go], 
                                         dim=0)
             
-            # timesteps = torch.from_numpy(self.timesteps[idx : idx + non_padding_len])
-            # timesteps = torch.cat([torch.zeros(([padding_len] + list(timesteps.shape[1:])), dtype=timesteps.dtype), timesteps], 
-            #                      dim=0)
-            
         return  timesteps, states, actions, returns_to_go
     
 def get_trajectory(trajectory, observation, action, reward, step):
@@ -112,42 +108,35 @@ def get_returns(rewards, target_return = 90):
         returns_to_go[i] = target_return - returns_to_go[i]
     return returns_to_go
 
-def make_action(trajectory, model, context_len, device, random=True):
+def make_action(trajectory, model, context_len, device):
     """ Given a state, return an action sampled from the model.
+        Notice: len(trajectory['observations']) == len(trajectory['actions']) + 1
     """
 
     if len(trajectory['observations']) == 0:
         action = np.random.randint(0, 3)
     else:
         state_dim = 84
-        states = torch.zeros((context_len, 4, state_dim, state_dim))
-        actions = np.zeros(context_len)
-        returns_to_go = np.zeros(context_len)
-        timesteps = trajectory['steps'][max(len(trajectory['steps'])-context_len, 0)]
-
-        rewards = trajectory['rewards']
-        rtg = get_returns(rewards)
-        for i in range(min(context_len, len(trajectory['observations']))):
-            state = trajectory['observations'][-i]
-            states[context_len-i-1] = torch.from_numpy(state)
-            action = trajectory['actions'][-i]
-            actions[context_len-i-1] = action
-            return_to_go = rtg[-i]
-            returns_to_go[context_len-i-1] = return_to_go
+        if len(trajectory['observations']) < context_len:
+            context_len = len(trajectory['observations'])
+            states = torch.tensor(trajectory['observations'], dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            actions = torch.tensor(trajectory['actions'], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
+            timesteps = torch.tensor(trajectory['steps'][0], dtype=torch.int64).reshape(1,1,1).to(device)
+            rewards = get_returns(trajectory['rewards'])
+            rtgs = torch.tensor(rewards).reshape(1, context_len, 1).to(device)
+        else:
+            states = torch.tensor(trajectory['observations'][-context_len:], dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
+            timesteps = torch.tensor(trajectory['steps'][-context_len], dtype=torch.int64).reshape(1,1,1).to(device)
+            rewards = get_returns(trajectory['rewards'])
+            rtgs = torch.tensor(rewards[-context_len:]).reshape(1, context_len, 1).to(device)
             
-        states = states.reshape(1,context_len,4,state_dim,state_dim).to(device)
-        actions = torch.from_numpy(actions).long().reshape(1,context_len,1).to(device)
-        returns_to_go = torch.from_numpy(returns_to_go).float().reshape(1,context_len,1).to(device)
-        timesteps = torch.tensor(timesteps, dtype=torch.int64).reshape(1,1,1).to(device)
         with torch.no_grad():
             logits, _ = model.forward(states = states,
                                     actions = actions,
                                     targets = None,
-                                    rtgs = returns_to_go,
+                                    rtgs = rtgs,
                                     timesteps = timesteps)
             probs = F.softmax(logits[:, -1, :], dim=-1)
-            if random:
-                action = torch.multinomial(probs, num_samples=1)
-            else:
-                action = torch.argmax(probs, keepdim=True)
+            action = torch.multinomial(probs, num_samples=1)
     return action

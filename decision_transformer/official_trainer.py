@@ -90,12 +90,18 @@ class Trainer:
         cum_reward = 0
         max_episodes = 10
         for i in range(max_episodes):
-            env.reset()
+            # initiate environment
+            observation, info = env.reset(seed=args.seed)
             trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+            trajectory['observations'].append(observation)
+            trajectory['steps'].append(0)
+            trajectory['rewards'].append(0)
+
+            # run episode
             sum_reward = 0
             step = 0
             while True:
-                action = make_action(trajectory, model, context_len, device, random=True)
+                action = make_action(trajectory, model, context_len, device)
                 observation, reward, terminated, info = env.step(action)
                 observation = np.array(observation) / 255.
                 trajectory = get_trajectory(trajectory, observation, action, reward, step)
