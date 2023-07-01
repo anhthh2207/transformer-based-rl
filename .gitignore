@@ -1,3 +1,4 @@
 data
 .buildt
 decision_transformer/dt_runs
+*__pycache__
