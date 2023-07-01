@@ -145,9 +145,8 @@ if __name__ == "__main__":
     print("model save path: " + save_model_path)
 
     # model and training config
-    env = gym.make(env_name)
     state_dim = 84
-    act_dim = env.action_space.n # 4
+    act_dim = 4
 
     conf = GPTConfig(state_dim=state_dim, act_dim=act_dim)
 
