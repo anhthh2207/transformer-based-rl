@@ -72,19 +72,17 @@ def experiment(device):
     state_dim = env.observation_space.shape[1] # state dimension
     act_dim = env.action_space.n # action dimension
 
-    # conf = GPTConfig(state_dim=state_dim,
-    #                     act_dim=act_dim)
-    # model = DecisionTransformer(state_dim=conf.state_dim,
-    #                             act_dim=conf.act_dim,
-    #                             n_blocks=conf.n_blocks,
-    #                             h_dim=conf.embed_dim,
-    #                             context_len=conf.context_len,
-    #                             n_heads=conf.n_heads,
-    #                             drop_p=conf.dropout_p).to(device)
-    conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
-    model = GPT(conf).to(device)
+    conf = GPTConfig(state_dim=state_dim,
+                        act_dim=act_dim)
+    model = DecisionTransformer(state_dim=conf.state_dim,
+                                act_dim=conf.act_dim,
+                                n_blocks=conf.n_blocks,
+                                h_dim=conf.embed_dim,
+                                context_len=conf.context_len,
+                                n_heads=conf.n_heads,
+                                drop_p=conf.dropout_p).to(device)
     # Load the trained weights
-    path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model_5.pt"
+    path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model_epoch5.pt"
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(path_to_model))
     else:

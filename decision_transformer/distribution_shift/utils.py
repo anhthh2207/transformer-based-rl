@@ -81,15 +81,15 @@ class StackedData(Dataset):
 
             # padding with zeros
             states = torch.from_numpy(self.states[idx : idx + non_padding_len]) / 255.
-            states = torch.cat([torch.zeros(([padding_len] + list(states.shape[1:])), dtype=states.dtype), states], 
+            states = torch.cat([states, torch.zeros(([padding_len] + list(states.shape[1:])), dtype=states.dtype)], 
                                 dim=0)
             
             actions = torch.from_numpy(self.actions[idx : idx + non_padding_len])
-            actions = torch.cat([torch.zeros(([padding_len] + list(actions.shape[1:])), dtype=actions.dtype), actions], 
+            actions = torch.cat([actions, torch.zeros(([padding_len] + list(actions.shape[1:])), dtype=actions.dtype)], 
                                dim=0)
 
             returns_to_go = torch.from_numpy(self.rtg[idx : idx + non_padding_len])
-            returns_to_go = torch.cat([torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype), returns_to_go], 
+            returns_to_go = torch.cat([returns_to_go, torch.zeros(([padding_len] + list(returns_to_go.shape[1:])), dtype=returns_to_go.dtype)], 
                                         dim=0)
             
         return  timesteps, states, actions, returns_to_go

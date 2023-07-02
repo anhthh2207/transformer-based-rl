@@ -147,7 +147,7 @@ if __name__ == "__main__":
     state_dim = 84
     act_dim = 6
 
-    conf = GPTConfig(vocab_size=act_dim, n_layer=12, n_head=12, n_embd=256, model_type='reward_conditioned', max_timestep=10000)
+    conf = GPTConfig(vocab_size=act_dim, n_layer=12, n_head=12, n_embd=264, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     
     # start training    

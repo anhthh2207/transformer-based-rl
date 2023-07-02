@@ -16,8 +16,6 @@ parser.add_argument('--mix_games', type=bool, default=True)
 args = parser.parse_args()
 
 if args.mix_games == False:
-	datasets = []
-
 	# Loop over all available datasets
 	for env_name in ['video-pinball', 'ms-pacman', 'enduro']:
 	# for env_name in ['breakout']:
