@@ -38,7 +38,7 @@ class GPTConfig:
     resid_pdrop = 0.1
     attn_pdrop = 0.1
 
-    def __init__(self, vocab_size, block_size=30*3, **kwargs):
+    def __init__(self, vocab_size, block_size=50*3, **kwargs):
         self.vocab_size = vocab_size
         self.block_size = block_size
         for k,v in kwargs.items():

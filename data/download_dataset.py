@@ -16,10 +16,8 @@ parser.add_argument('--mix_games', type=bool, default=True)
 args = parser.parse_args()
 
 if args.mix_games == False:
-	datasets = []
-
 	# Loop over all available datasets
-	for env_name in ['airraid', 'pong', 'stargunner']:
+	for env_name in ['video-pinball', 'ms-pacman', 'enduro']:
 	# for env_name in ['breakout']:
 		# for dataset_type in ['mixed', 'medium', 'expert']:
 		for dataset_type in ['expert']:
@@ -80,8 +78,8 @@ else:
 	paths = []
 
 	# Loop over all available datasets
-	for env_name in ['air_raid', 'up_n_down' 'star_gunner', 'pong', 'qbert']:
-		dataset_type = 'expert'
+	for env_name in ['air-raid', 'space-invaders', 'pong', 'qbert']:
+		dataset_type = 'mixed'
 		name = f'{env_name}-{dataset_type}-v2'
 		env = gym.make(name, stack=False) # stack = [True, False]
 		env.reset()
