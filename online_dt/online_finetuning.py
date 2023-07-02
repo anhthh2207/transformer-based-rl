@@ -4,14 +4,13 @@ from torch.nn import functional as F
 import numpy as np
 
 from utils import set_seed, AtariEnv
-from replay_buffer import ReplayBuffer
+from replay_buffer import ReplayBuffer, GreedyReplayBuffer
 
 set_seed(123)
 
 def get_trajectory(trajectory, observation, action, reward, step):
     """ Collect observed trajectory from the environment.
     """
-
     trajectory['observations'].append(observation)
     trajectory['actions'].append(action)
     trajectory['rewards'].append(reward)
@@ -96,11 +95,12 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
         while True:
             action = make_action(trajectory, pretrained_model, 30, device).item()
             observation, reward, done, info = env.step(action)
+            env.render()
             observation = np.array(observation).reshape(1, 84, 84)/255.0
             trajectory = get_trajectory(trajectory, observation, action, reward, step)
             sum_reward += reward
             step += 1
-            if done or step > 999:
+            if done or step > 10000:
                 trajectory['rewards'] = np.array(trajectory['rewards'])
                 trajectory['observations'] = np.array(trajectory['observations'])/255.0
                 trajectory['actions'] = np.array(trajectory['actions'])
@@ -109,10 +109,82 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
                 print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
                 print("Update model...")
                 loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device)
+                # sum_reward_values.append(sum_reward)
+                # loss_values.append(loss)
+                # cross_entropy_values.append(cross_entropy)
+                # shannon_entropy_values.append(shannon_entropy)
+                break
+        
+        if (episode+1) % 50 == 0:
+            torch.save(pretrained_model.state_dict(), '{}/online_model_episode{}.pth'.format(save_path, episode))
+    
+    return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
+
+
+def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device):
+    sum_reward_values = []
+    loss_values = []
+    cross_entropy_values = []
+    shannon_entropy_values = []
+
+    replay_buffer = GreedyReplayBuffer(buffer_size, offline_trajectories)
+    # print("Third quatile rewards: ", replay_buffer.third_quantile_reward())
+    # x = replay_buffer.greedy_sample(5)
+    for i in replay_buffer.trajectories:
+        if type(i) != dict:
+            print("\n0: ", i)
+            exit()
+    env = AtariEnv(env, stack=False)
+    pretrained_model.train()
+
+    numb_added_trajs = 0
+    threshold = replay_buffer.third_quantile_reward()
+    for episode in range(episodes):
+        # using model to make action
+        trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
+        observation = env.reset()
+        action = make_action(trajectory, pretrained_model, 30, device)
+        observation, reward, done, info = env.step(action)
+        observation = np.array(observation).reshape(1, 84, 84)/255.0
+        trajectory['observations'].append(observation)
+        trajectory['rewards'].append(reward)
+        trajectory['steps'].append(0)
+
+        step = 1
+        sum_reward = 0
+        while True:
+            action = make_action(trajectory, pretrained_model, 30, device).item()
+            observation, reward, done, info = env.step(action)
+            env.render()
+            observation = np.array(observation).reshape(1, 84, 84)/255.0
+            trajectory = get_trajectory(trajectory, observation, action, reward, step)
+            sum_reward += reward
+            step += 1
+            if done or step > 10000:
+                print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
                 sum_reward_values.append(sum_reward)
-                loss_values.append(loss)
-                cross_entropy_values.append(cross_entropy)
-                shannon_entropy_values.append(shannon_entropy)
+                if sum_reward >= threshold:
+                # if sum_reward > 70:
+                    trajectory['rewards'] = np.array(trajectory['rewards'])
+                    trajectory['observations'] = np.array(trajectory['observations'])/255.0
+                    trajectory['actions'] = np.array(trajectory['actions'])
+                    trajectory['steps'] = np.array(trajectory['steps'])
+                    replay_buffer.add_new_trajs(trajectory)
+                    numb_added_trajs += 1
+                    print("Add trajectory to replay buffer (Threshold: {}, Number of trajs added: {}/10)".format(threshold, numb_added_trajs))
+                
+                if numb_added_trajs >= 10:
+                    # update threshold
+                    threshold = replay_buffer.third_quantile_reward()
+                    print("Update threshold: ", threshold)
+                    # update model
+                    print("Update model...")
+                    loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device, greedy=True)
+                    # sum_reward_values.append(sum_reward)
+                    # loss_values.append(loss)
+                    # cross_entropy_values.append(cross_entropy)
+                    # shannon_entropy_values.append(shannon_entropy)
+                    numb_added_trajs = 0
                 break
         
         if (episode+1) % 100 == 0:
@@ -120,12 +192,16 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
     
     return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
 
-def update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size, device, batch_size=32):
+
+def update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size, device, batch_size=10, greedy=False):
     """ Update the model.
     """
     assert len(replay_buffer) >= batch_size, 'Insufficient samples in replay buffer.'
     # sample a batch of trajectories
-    trajectories = replay_buffer.sample(batch_size)
+    if greedy:
+        trajectories = replay_buffer.greedy_sample(batch_size)
+    else:
+        trajectories = replay_buffer.sample(batch_size)
     # trajectories is a list of trajectories in the format of (states, actions, rewards) where states: # t, 4, 84, 84, actions: # t, 1, rewards: # t, 1
     # create actions shape # K, block_size, action_dim
     # create states shape # K, block_size, 4*84*84
@@ -137,14 +213,22 @@ def update_model(episode, model, optimizers, replay_buffer, gradient_iterations,
     states = torch.tensor(states, dtype=torch.float32).to(device)
     actions = torch.tensor(actions, dtype=torch.long).to(device)
     rtgs = torch.tensor(rtgs, dtype=torch.float32).to(device)
-    sub_timesteps = torch.split(timesteps, 128, dim=0)
-    sub_states = torch.split(states, 128, dim=0)
-    sub_actions = torch.split(actions, 128, dim=0)
-    sub_rtgs = torch.split(rtgs, 128, dim=0)
+
+    sub_timesteps = torch.split(timesteps, 3, dim=0)
+    sub_states = torch.split(states, 3, dim=0)
+    sub_actions = torch.split(actions, 3, dim=0)
+    sub_rtgs = torch.split(rtgs, 3, dim=0)
+    assert len(sub_states) == len(sub_actions) == len(sub_rtgs) == len(sub_timesteps), f'Incorrect number of sub batches. {len(sub_states)}, {len(sub_actions)}, {len(sub_rtgs)}, {len(sub_timesteps)}'
 
     for i in range(gradient_iterations):
-        for j in range(len(sub_states)):
+        for j in range(len(sub_states)-1):
             # forward pass      
+            assert sub_states[j].shape[0] == sub_actions[j].shape[0] == sub_rtgs[j].shape[0] == sub_timesteps[j].shape[0], 'Incorrect number of samples in sub batch.'
+            assert sub_states[j].shape[1] == sub_actions[j].shape[1] == sub_rtgs[j].shape[1] == sub_timesteps[j].shape[1] == block_size, 'Incorrect number of block size in sub batch.'
+            assert sub_states[j].shape[2] == 1*84*84, 'Incorrect number of state dimension.'
+            assert sub_actions[j].shape[2] == 1, 'Incorrect number of action dimension.'
+            assert sub_rtgs[j].shape[2] == 1, 'Incorrect number of rtgs dimension.'
+            assert sub_timesteps[j].shape[2] == 1, 'Incorrect number of timesteps dimension.'
             logits, cross_entropy = model.forward(states = sub_states[j], 
                                         actions = sub_actions[j], 
                                         targets = sub_actions[j], 
@@ -158,7 +242,7 @@ def update_model(episode, model, optimizers, replay_buffer, gradient_iterations,
             shannon_entropy = ShannonEntropy(logits)
 
             # loss
-            loss = cross_entropy - model.temperature()*shannon_entropy
+            loss = cross_entropy - 0* model.temperature()*shannon_entropy
             # loss_optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
             loss_optimizer.zero_grad()
             loss.backward()
@@ -168,7 +252,8 @@ def update_model(episode, model, optimizers, replay_buffer, gradient_iterations,
             # update temperature
             # log_temperature_optimizer = torch.optim.Adam([model.log_temperature], lr=1e-4, beta=[0.9, 0.999]).detach()
             log_temperature_optimizer.zero_grad()
-            temperature_loss = model.temperature() * (shannon_entropy - model.target_shannon_entropy).detach()
+            a = shannon_entropy - model.target_shannon_entropy
+            temperature_loss = 0 * (model.temperature() * a.detach())
             temperature_loss.backward()
             log_temperature_optimizer.step()
 
@@ -176,29 +261,32 @@ def update_model(episode, model, optimizers, replay_buffer, gradient_iterations,
     
     return loss.item(), cross_entropy, shannon_entropy
 
+
 def ShannonEntropy(logits):
     probs = F.softmax(logits, dim=-1)
     dist = torch.distributions.Multinomial(probs=probs)
-    samples = dist.sample((5,))
+    samples = dist.sample((10,))
     shannon_entropy = -dist.log_prob(samples).mean(dim=[0, 1]).sum(dim=-1)
     return shannon_entropy
 
-# def negative_log_likelihood(logits, targets, actions):
-#     probs = F.softmax(logits, dim=-1)
-#     dist = torch.distributions.Multinomial(probs=probs)
-#     log_probs = dist.log_prob(actions).mean(dim=[0, 1]).sum(dim=-1)
-#     return -log_probs
+
+def negative_log_likelihood(logits, targets, actions):
+    probs = F.softmax(logits, dim=-1)
+    dist = torch.distributions.Multinomial(probs=probs)
+    log_probs = dist.log_prob(actions).mean(dim=[0, 1]).sum(dim=-1)
+    return -log_probs
+
 
 def formating_data(trajectories, block_size):
     states = trajectories[0]['observations']
     actions = trajectories[0]['actions']
-    rewards = discount_cumsum(trajectories[0]['rewards'])
+    rtgs = discount_cumsum(trajectories[0]['rewards'])
     timesteps = np.arange(trajectories[0]['observations'].shape[0])
-    for i in range(len(trajectories)):
+    for i in range(len(trajectories)-1):
         states = np.concatenate((states, trajectories[i]['observations']), axis=0)
         actions = np.concatenate((actions, trajectories[i]['actions']))
         traj_rtgs = np.array(discount_cumsum(trajectories[i]['rewards']))
-        rewards = np.concatenate((rewards, traj_rtgs))
+        rtgs = np.concatenate((rtgs, traj_rtgs))
         timesteps = np.concatenate((timesteps, np.arange(trajectories[i]['observations'].shape[0])))
 
     # padding
@@ -207,18 +295,23 @@ def formating_data(trajectories, block_size):
 
     actions = np.concatenate((actions, np.zeros(block_size - actions.shape[0]%block_size)))
     actions = torch.from_numpy(actions)
-    rewards = np.concatenate((rewards, np.zeros(block_size - rewards.shape[0]%block_size)))
-    rewards = torch.from_numpy(rewards)
+    rtgs = np.concatenate((rtgs, np.zeros(block_size - rtgs.shape[0]%block_size)))
+    rtgs = torch.from_numpy(rtgs)
     timesteps = np.concatenate((timesteps, np.zeros(block_size - timesteps.shape[0]%block_size)))
     timesteps = torch.from_numpy(timesteps)
+    assert states.shape[0]%block_size == 0
+    assert actions.shape[0]%block_size == 0
+    assert rtgs.shape[0]%block_size == 0
+    assert timesteps.shape[0]%block_size == 0
+    assert states.shape[0] == actions.shape[0] == rtgs.shape[0] == timesteps.shape[0], 'Incorrect number of samples in batch.'
 
     # split and reshape
     states = states.view(-1, block_size, states.shape[1]*states.shape[2]*states.shape[3])/255.0
     actions = actions.view(-1, block_size, 1)
-    rewards = rewards.view(-1, block_size, 1)
+    rtgs = rtgs.view(-1, block_size, 1)
     timesteps = timesteps.view(-1, block_size, 1)
 
-    return timesteps, states, actions, rewards
+    return timesteps, states, actions, rtgs
 
 
 def discount_cumsum(x, gamma=1.0):
