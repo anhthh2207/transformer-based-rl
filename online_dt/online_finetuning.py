@@ -40,7 +40,7 @@ def make_action(trajectory, model, context_len, device):
         state_dim = 84
         if len(trajectory['observations']) < context_len:
             context_len = len(trajectory['observations'])
-            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][0], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
@@ -49,7 +49,7 @@ def make_action(trajectory, model, context_len, device):
             # trajectory['observations'] = trajectory['observations'][-context_len:]
             # trajectory['actions'] = trajectory['actions'][-context_len+1:]
             # trajectory['rewards'] = trajectory['rewards'][-context_len:]
-            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][-context_len], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
@@ -67,8 +67,17 @@ def make_action(trajectory, model, context_len, device):
 
 
 def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device):
+    sum_reward_values = []
+    loss_values = []
+    cross_entropy_values = []
+    shannon_entropy_values = []
+
     replay_buffer = ReplayBuffer(buffer_size, offline_trajectories)
-    env = AtariEnv(env, stack=True)
+    for i in replay_buffer.trajectories:
+        if type(i) != dict:
+            print("\n0: ", i)
+            exit()
+    env = AtariEnv(env, stack=False)
     pretrained_model.train()
 
     for episode in range(episodes):
@@ -77,7 +86,7 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
         observation = env.reset()
         action = make_action(trajectory, pretrained_model, 30, device)
         observation, reward, done, info = env.step(action)
-        observation = np.array(observation)/255.0
+        observation = np.array(observation).reshape(1, 84, 84)/255.0
         trajectory['observations'].append(observation)
         trajectory['rewards'].append(reward)
         trajectory['steps'].append(0)
@@ -85,26 +94,33 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
         step = 1
         sum_reward = 0
         while True:
-            action = make_action(trajectory, pretrained_model, 10, device)
+            action = make_action(trajectory, pretrained_model, 30, device).item()
             observation, reward, done, info = env.step(action)
-            observation = np.array(observation)/255.0
+            observation = np.array(observation).reshape(1, 84, 84)/255.0
             trajectory = get_trajectory(trajectory, observation, action, reward, step)
             sum_reward += reward
             step += 1
-            if done or step > 1000:
-                print('Episode: {}, Reward: {}, Step: {}'.format(episode, sum_reward, step))
+            if done or step > 999:
                 trajectory['rewards'] = np.array(trajectory['rewards'])
-                trajectory['observations'] = np.array(trajectory['observations'])
+                trajectory['observations'] = np.array(trajectory['observations'])/255.0
                 trajectory['actions'] = np.array(trajectory['actions'])
+                trajectory['steps'] = np.array(trajectory['steps'])
                 replay_buffer.add_new_trajs(trajectory)
-                update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size=model.block_size)
+                print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
+                print("Update model...")
+                loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device)
+                sum_reward_values.append(sum_reward)
+                loss_values.append(loss)
+                cross_entropy_values.append(cross_entropy)
+                shannon_entropy_values.append(shannon_entropy)
                 break
         
         if (episode+1) % 100 == 0:
-            torch.save(model.state_dict(), '{}/online_model_episode{}.pth'.format(save_path, episode))
+            torch.save(pretrained_model.state_dict(), '{}/online_model_episode{}.pth'.format(save_path, episode))
+    
+    return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
 
-
-def update_model(episde, model, optimizers, replay_buffer, gradient_iterations, block_size, batch_size=32):
+def update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size, device, batch_size=32):
     """ Update the model.
     """
     assert len(replay_buffer) >= batch_size, 'Insufficient samples in replay buffer.'
@@ -116,10 +132,16 @@ def update_model(episde, model, optimizers, replay_buffer, gradient_iterations, 
     # create rtgs shape # K, block_size, 1
     # create timesteps shape # K, 1, 1
     timesteps, states, actions, rtgs = formating_data(trajectories, block_size)
-    sub_time_steps = torch.split(timesteps, 128, dim=0)
+    # convert to correct type
+    timesteps = torch.tensor(timesteps, dtype=torch.int64).to(device)
+    states = torch.tensor(states, dtype=torch.float32).to(device)
+    actions = torch.tensor(actions, dtype=torch.long).to(device)
+    rtgs = torch.tensor(rtgs, dtype=torch.float32).to(device)
+    sub_timesteps = torch.split(timesteps, 128, dim=0)
     sub_states = torch.split(states, 128, dim=0)
     sub_actions = torch.split(actions, 128, dim=0)
     sub_rtgs = torch.split(rtgs, 128, dim=0)
+
     for i in range(gradient_iterations):
         for j in range(len(sub_states)):
             # forward pass      
@@ -127,7 +149,7 @@ def update_model(episde, model, optimizers, replay_buffer, gradient_iterations, 
                                         actions = sub_actions[j], 
                                         targets = sub_actions[j], 
                                         rtgs = sub_rtgs[j], 
-                                        timesteps = sub_timesteps[j])
+                                        timesteps = sub_timesteps[j][:,0, :].view(-1, 1, 1))
             # logits: batch_size*block_size, block_size, 3
 
             # backward pass ###################################################
@@ -146,12 +168,13 @@ def update_model(episde, model, optimizers, replay_buffer, gradient_iterations, 
             # update temperature
             # log_temperature_optimizer = torch.optim.Adam([model.log_temperature], lr=1e-4, beta=[0.9, 0.999]).detach()
             log_temperature_optimizer.zero_grad()
-            temperature_loss = (model.temperature().detach()) * (shannon_entropy - model.target_shannon_entropy).detach()
+            temperature_loss = model.temperature() * (shannon_entropy - model.target_shannon_entropy).detach()
             temperature_loss.backward()
             log_temperature_optimizer.step()
 
         print(f'Episode: {episode}, Iteration: {i}, Loss: {loss.item()}, Cross Entropy: {cross_entropy}, Shannon Entropy: {shannon_entropy}, Temperature: {model.temperature().item()}')
-
+    
+    return loss.item(), cross_entropy, shannon_entropy
 
 def ShannonEntropy(logits):
     probs = F.softmax(logits, dim=-1)
@@ -160,6 +183,11 @@ def ShannonEntropy(logits):
     shannon_entropy = -dist.log_prob(samples).mean(dim=[0, 1]).sum(dim=-1)
     return shannon_entropy
 
+# def negative_log_likelihood(logits, targets, actions):
+#     probs = F.softmax(logits, dim=-1)
+#     dist = torch.distributions.Multinomial(probs=probs)
+#     log_probs = dist.log_prob(actions).mean(dim=[0, 1]).sum(dim=-1)
+#     return -log_probs
 
 def formating_data(trajectories, block_size):
     states = trajectories[0]['observations']

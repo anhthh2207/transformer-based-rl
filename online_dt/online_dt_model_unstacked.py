@@ -32,7 +32,6 @@ class GELU(nn.Module):
     def forward(self, input):
         return F.gelu(input)
 
-
 class GPTConfig:
     """ base GPT config, params common to all GPT versions """
     embd_pdrop = 0.1
@@ -50,7 +49,6 @@ class GPT1Config(GPTConfig):
     n_layer = 12
     n_head = 12
     n_embd = 768
-
 
 class CausalSelfAttention(nn.Module):
     """
@@ -123,6 +121,7 @@ class GPT(nn.Module):
 
     def __init__(self, config):
         super().__init__()
+
         self.config = config
 
         self.model_type = config.model_type
@@ -147,7 +146,7 @@ class GPT(nn.Module):
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
 
-        self.state_encoder = nn.Sequential(nn.Conv2d(4, 32, 8, stride=4, padding=0), nn.ReLU(),
+        self.state_encoder = nn.Sequential(nn.Conv2d(1, 32, 8, stride=4, padding=0), nn.ReLU(),
                                  nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
                                  nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU(),
                                  nn.Flatten(), nn.Linear(3136, config.n_embd), nn.Tanh())
@@ -156,7 +155,6 @@ class GPT(nn.Module):
 
         self.action_embeddings = nn.Sequential(nn.Embedding(config.vocab_size, config.n_embd), nn.Tanh())
         nn.init.normal_(self.action_embeddings[0].weight, mean=0.0, std=0.02)
-
         ## temperature
         self.log_temperature = torch.tensor(np.log(0.01))
         self.log_temperature.requires_grad = True
@@ -164,6 +162,7 @@ class GPT(nn.Module):
     
     def temperature(self):
         return torch.exp(self.log_temperature)
+
 
     def get_block_size(self):
         return self.block_size
@@ -178,13 +177,13 @@ class GPT(nn.Module):
             module.weight.data.fill_(1.0)
 
     def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
-        # states: (batch, block_size, 4*84*84)
+        # states: (batch, block_size, 1*84*84)
         # actions: (batch, block_size, 1)
         # targets: (batch, block_size, 1)
         # rtgs: (batch, block_size, 1)
         # timesteps: (batch, 1, 1)
 
-        state_embeddings = self.state_encoder(states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()) # (batch * block_size, n_embd)
+        state_embeddings = self.state_encoder(states.reshape(-1, 1, 84, 84).type(torch.float32).contiguous()) # (batch * block_size, n_embd)
         state_embeddings = state_embeddings.reshape(states.shape[0], states.shape[1], self.config.n_embd) # (batch, block_size, n_embd)
         
         if actions is not None and self.model_type == 'reward_conditioned': 
@@ -216,7 +215,6 @@ class GPT(nn.Module):
         all_global_pos_emb = torch.repeat_interleave(self.global_pos_emb, batch_size, dim=0) # batch_size, traj_length, n_embd
 
         position_embeddings = torch.gather(all_global_pos_emb, 1, torch.repeat_interleave(timesteps, self.config.n_embd, dim=-1)) + self.pos_emb[:, :token_embeddings.shape[1], :]
-
         x = self.drop(token_embeddings + position_embeddings)
         x = self.blocks(x)
         x = self.ln_f(x)
@@ -227,9 +225,7 @@ class GPT(nn.Module):
         elif actions is None and self.model_type == 'reward_conditioned':
             logits = logits[:, 1:, :]
         elif actions is not None and self.model_type == 'naive':
-            predicted_states = logits[:, 1::2, :] # only keep predictions from state_embeddings
-            predicted_action = logits[:, ::2, :] # only keep predictions from state_embeddings
-            predicted_rewards = torch.gather(action, 2, actions.type(torch.long).unsqueeze(-1)).squeeze(-1)
+            logits = logits[:, ::2, :] # only keep predictions from state_embeddings
         elif actions is None and self.model_type == 'naive':
             logits = logits # for completeness
         else:

@@ -27,13 +27,14 @@ class ReplayBuffer(object):
 
     def add_new_trajs(self, new_trajs):
         if len(self.trajectories) < self.capacity:
-            self.trajectories.extend(new_trajs)
-            self.trajectories = self.trajectories[-self.capacity :]
+            self.trajectories.append(new_trajs)
         else:
-            self.trajectories[
-                self.start_idx : self.start_idx + len(new_trajs)
-            ] = new_trajs
-            self.start_idx = (self.start_idx + len(new_trajs)) % self.capacity
+            # self.trajectories[
+            #     self.start_idx : self.start_idx + len(new_trajs)
+            # ] = new_trajs
+            # self.start_idx = (self.start_idx + len(new_trajs)) % self.capacity
+            self.trajectories.append(new_trajs)
+            self.trajectories = self.trajectories[-self.capacity :]
 
         assert len(self.trajectories) <= self.capacity
 

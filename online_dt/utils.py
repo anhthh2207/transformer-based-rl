@@ -29,15 +29,18 @@ class D4RLTrajectoryDataset(Dataset):
     def __init__(self, dataset_path):
         # load dataset
         with open(dataset_path, 'rb') as f:
+            print("Loading Data")
             self.trajectories = pickle.load(f)
 
+        print("Preprocessing Data")
         for i in range(len(self.trajectories)):
             rewards = np.array(discount_cumsum(self.trajectories[i]['rewards']))
             observations = np.array(self.trajectories[i]['observations'])
             actions = np.array(self.trajectories[i]['actions'])
             trajectory = {'rewards': rewards, 'observations': observations, 'actions': actions}
             self.trajectories[i] = trajectory
-    
+        print("Preprocessing Done!!")
+
     def __len__(self):
         return len(self.trajectories)
     
