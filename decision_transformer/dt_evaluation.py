@@ -47,6 +47,9 @@ def make_action(trajectory, model, context_len, device):
             rewards = get_returns(trajectory['rewards'])
             rtgs = torch.tensor(rewards).reshape(1, context_len, 1).to(device)
         else:
+            trajectory['observations'] = trajectory['observations'][-context_len:]
+            trajectory['actions'] = trajectory['actions'][-context_len+1:]
+            trajectory['rewards'] = trajectory['rewards'][-context_len:]
             states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 4, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][-context_len], dtype=torch.int64).reshape(1,1,1).to(device)
@@ -84,8 +87,10 @@ def experiment(device):
     conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     # Load the trained weights
-    path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model_5.pt"
+    # path_to_model = "dt_runs/dt_breakout-expert-v2_stacked_model_5.pt"
+    path_to_model = "decision_transformer/dt_runs/dt_breakout-expert-v2_stacked_model_5.pt"
     if torch.cuda.is_available():
+        print('Using GPU')
         model.load_state_dict(torch.load(path_to_model))
     else:
         model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
@@ -99,17 +104,23 @@ def experiment(device):
         env.reset()
         trajectory = {'observations': [], 'actions': [], 'rewards': [], 'steps': []}
         action = make_action(trajectory, model, 30, device)
+        # print(type(action), action)
         observation, reward, terminated, info = env.step(action)
         observation = np.array(observation) / 255.
         trajectory['observations'].append(observation)
         trajectory['rewards'].append(reward)
         trajectory['steps'].append(0)
-        
+
         step = 1
         sum_reward = 0
+        epsilon = 0.05
         while True:
-            action = make_action(trajectory, model, 30, device)
+            if np.random.random() < epsilon:
+                action = np.random.randint(0, 3)
+            else:
+                action = make_action(trajectory, model, 30, device)
             observation, reward, terminated, info = env.step(action)
+            env.render()
             observation = np.array(observation) / 255.
             trajectory = get_trajectory(trajectory, observation, action, reward, step)
             step += 1
