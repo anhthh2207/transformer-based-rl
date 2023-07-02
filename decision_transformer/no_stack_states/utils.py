@@ -105,7 +105,7 @@ def get_trajectory(trajectory, observation, action, reward, step):
 
     return trajectory
 
-def get_returns(rewards, target_return = 90):
+def get_returns(rewards, target_return = 200):
     """ Calculate the returns to go.
     """
 
@@ -127,13 +127,13 @@ def make_action(trajectory, model, context_len, device):
         state_dim = 84
         if len(trajectory['observations']) < context_len:
             context_len = len(trajectory['observations'])
-            states = torch.tensor(trajectory['observations'], dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][0], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
             rtgs = torch.tensor(rewards).reshape(1, context_len, 1).to(device)
         else:
-            states = torch.tensor(trajectory['observations'][-context_len:], dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
             actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][-context_len], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])

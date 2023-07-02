@@ -8,8 +8,7 @@ import os
 import argparse
 from tqdm import tqdm
 
-from utils import set_seed, AtariEnv
-from official_utils import StackedData, get_trajectory, make_action
+from official_utils import StackedData, get_trajectory, make_action, set_seed, AtariEnv
 from official_model import GPT, GPTConfig
 
 class Trainer:
@@ -136,7 +135,7 @@ if __name__ == "__main__":
     env_d4rl_name = f'breakout-{dataset}-v2'
 
     # dataset path
-    dataset_path = '../data/' + env_d4rl_name + '-stacked.pkl'
+    dataset_path = '../../data/' + env_d4rl_name + '-stacked.pkl'
 
     # model saving directory
     log_dir = "./dt_runs/"

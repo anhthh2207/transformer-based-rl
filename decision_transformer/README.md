@@ -1,14 +1,18 @@
-General info:
+# Decision Transformer
 
-Input to the model: 
+Paper: [Decision Transformer](https://arxiv.org/pdf/2106.01345.pdf), Official Code: [Code](https://github.com/kzl/decision-transformer)
 
-- timesteps: matrix of size (B,T)
-- states: matrix of size (B,T,state_dim,state_dim)
-- actions: matrix of size (B,T*action_dim)
-- returns_to_go: matrix of size (B,T)
+### Conducted Experiments 
 
-For atari, state_dim = 84
+1. Input data test: Use data with 1 frame per step, and data with 4 frames per step. The code is stored in the folders `stack_states` and `no_stack_states`.
 
-Notice: T = context_len $\Rightarrow$ Later stack 3 matrices (after embedding) and get sequence length = 3\*T $\Rightarrow$ input size (B,3\*T,h_dim)
+- General Info: The data with no stack weighs ~13GB, while the data with stacked frames weighs ~51GB, both contains 1M steps.
+- Setup: The target return is set to 90 for both models in evaluation phase.
+- Result: There is no significant difference in the performance between the models trained on the two dataset. Both achieve the score of more than 100 on average over 10 episodes.
 
-Output: (state_preds (state_dim), action_preds (action_dim), return_preds (1))
+2. Out-of-distribution test: The model is trained on multiple environments and tested on a new unseen environment. The code is stored in the folder `distribution_shift`.
+
+- Data: The data is collected with 500,000 steps from 4 games `'air-raid', 'space-invaders', 'pong', 'qbert'`. In total, the dataset contains 2M steps and weighs ~21GB. The model is then evaluated on the `StarGunner` environment for the out-of-distribution test.
+- Result: 
+
+3. Minimal version: a minimal and easy to understand version of the decision transformer is reimplemented with comparable performance to the original model. A new and simple training procedure is also used to train both models in our experiments. The model is stored in the folder `minimal_model`.
