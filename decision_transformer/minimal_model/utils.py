@@ -160,7 +160,7 @@ def make_action(trajectory, model, context_len, device):
     """ Given a state, return an action sampled from the model.
     """
 
-    if len(trajectory['observations']) == 0:
+    if len(trajectory['actions']) == 0:
         action = np.random.randint(0, 3)
     else:
         state_dim = 84

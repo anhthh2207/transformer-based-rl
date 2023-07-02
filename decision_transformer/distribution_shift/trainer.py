@@ -120,7 +120,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=123)
     parser.add_argument('--epochs', type=int, default=5)
-    parser.add_argument('--batch_size', type=int, default=512)
+    parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--lr', type=int, default=6e-4)
     parser.add_argument('--wt_decay', type=int, default=0.1)
     parser.add_argument('--warmup_steps', type=int, default=512*20)

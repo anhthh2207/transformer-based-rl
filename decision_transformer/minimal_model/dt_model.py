@@ -130,8 +130,8 @@ class DecisionTransformer(nn.Module):
         nn.init.normal_(self.embed_action[0].weight, mean=0.0, std=0.02)
 
         # report number of parameters (note we don't count the decoder parameters in lm_head)
-        n_params = sum(p.numel() for p in self.transformer.parameters())
-        print("number of parameters: %.2fM" % (n_params/1e6,))
+        n_params = sum(p.numel() for p in self.parameters())
+        print("Number of parameters: %.2fM" % (n_params/1e6,))
 
     def _init_weights(self, module):
         if isinstance(module, (nn.Linear, nn.Embedding)):

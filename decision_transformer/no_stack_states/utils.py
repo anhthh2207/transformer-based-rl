@@ -121,7 +121,7 @@ def make_action(trajectory, model, context_len, device):
         Notice: len(trajectory['observations']) == len(trajectory['actions']) + 1
     """
 
-    if len(trajectory['observations']) == 0:
+    if len(trajectory['actions']) == 0:
         action = np.random.randint(0, 3)
     else:
         state_dim = 84
