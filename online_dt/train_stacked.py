@@ -9,7 +9,7 @@ import argparse
 from tqdm import tqdm
 
 from utils import D4RLTrajectoryDataset, set_seed, AtariEnv
-from online_dt_model import GPT, GPTConfig
+from online_dt_model_stacked import GPT, GPTConfig
 from online_finetuning import online_finetuning
 
 
