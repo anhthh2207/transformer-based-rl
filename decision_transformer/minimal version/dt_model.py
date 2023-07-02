@@ -103,6 +103,7 @@ class DecisionTransformer(nn.Module):
         self.embed_timestep = nn.Sequential(nn.Embedding(max_timestep, h_dim), nn.Tanh())
 
         self.embed_rtg = nn.Sequential(nn.Linear(1, h_dim), nn.Tanh())
+        self.embed_action = nn.Sequential(nn.Embedding(act_dim, h_dim), nn.Tanh())
         
         # self.embed_state = nn.Linear(state_dim*context_len, h_dim*context_len)
         self.embed_state = nn.Sequential(
@@ -111,8 +112,6 @@ class DecisionTransformer(nn.Module):
                             nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU(),
                             nn.Flatten(), nn.Linear(3136, h_dim), nn.Tanh())
         
-        use_action_tanh = False # False for discrete actions
-
         self.embed_ln = nn.LayerNorm(h_dim)
 
         ### transformer blocks
@@ -128,7 +127,6 @@ class DecisionTransformer(nn.Module):
         # init all weights
         self.apply(self._init_weights)
 
-        self.embed_action = nn.Sequential(nn.Embedding(act_dim, h_dim), nn.Tanh())
         nn.init.normal_(self.embed_action[0].weight, mean=0.0, std=0.02)
 
         # report number of parameters (note we don't count the decoder parameters in lm_head)
@@ -151,14 +149,14 @@ class DecisionTransformer(nn.Module):
         # rtgs: (batch, block_size)
         # timesteps: (batch, block_size)
 
-        B = states.shape[0] # batch size, context length, state_dim, state_dim
+        B = states.shape[0] # batch size
         T = states.shape[1] # context length
 
         time_embeddings = self.embed_timestep(timesteps.type(torch.long)).reshape(B, T, self.h_dim)
 
-        # time embeddings are treated similar to positional embeddings
         state_embeddings = self.embed_state(states.reshape(B*T,4,84,84).type(torch.float32))
         state_embeddings = state_embeddings.reshape(B, T, self.h_dim)
+        # the last action is unknown in evaluation mode
         action_embeddings = self.embed_action(actions.type(torch.long)).reshape(B, T - int(targets is None), self.h_dim)
         returns_embeddings = self.embed_rtg(rtgs.reshape(B,T,1).type(torch.float32)).reshape(B, T, self.h_dim)
 
