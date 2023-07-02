@@ -160,6 +160,7 @@ class GPT(nn.Module):
         ## temperature
         self.log_temperature = torch.tensor(np.log(0.01))
         self.log_temperature.requires_grad = True
+        self.target_shannon_entropy = -4
     
     def temperature(self):
         return torch.exp(self.log_temperature)

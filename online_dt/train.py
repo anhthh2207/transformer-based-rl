@@ -55,7 +55,7 @@ if __name__ == "__main__":
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--wt_decay', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=1000)
-    parser.add_argument('--episodes', type=int, default=100)
+    parser.add_argument('--episodes', type=int, default=1000)
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--trained_path', type=str, default='decision_transformer/dt_runs/dt_breakout-expert-v2_stacked_model_5.pt')
     parser.add_argument('--buffer_size', type=int, default=50)
