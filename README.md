@@ -6,9 +6,9 @@ Final Project COMP2050 - VinUniversity
 
 **Description**: 
 
-- Goal 1: analyze the SOTA transformer-based reinforcement learning models including Decision Transformer and Trajectory Transformer. Another traditional method which is Conservative Q-Learning will also be implemented to compare the performance with the others. The environment used for evaluation is the Atari Gym environment.
+- Goal 1: Implement a minimal version of the Decision Transformer model to play the Atari Breakout game
 
-- Goal 2: try to combine the use of transformer-based language models in RL problems with a traditional method to solve RL problem which is the actor-critic approach. The combination is born with the hope to increase the stability of the Decision Transformer model.
+- Goal 2: Train the model on multiple environments and test its ability to generalize to new distributions
 
 ## How to run
 
@@ -25,15 +25,16 @@ In order to use atari, you must import ROMS following [this instruction](https:/
 ```bash
 cd data
 pip install git+https://github.com/takuseno/d4rl-atari
-python download_dataset.py
+python download_dataset.py --mix_games False
 ```
+Use `--mix_games True` to download synthetic dataset used for the distribution shift experiment
 
-### Run Experiment
+<!-- ### Run Experiment
 ```bash
 python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 ```
 
-**Game options**: `boxing`, `alien`, `breakout`
+**Game options**: `boxing`, `alien`, `breakout` -->
 
 **Data options**: `mixed`, `medium`, `expert`
 
@@ -41,14 +42,7 @@ python experiments.py --game [GAME] --dataset [DATA_TYPE] --model_type [MODEL]
 - `medium` denotes datasets collected at between 9M steps and 10M steps.
 - `expert` denotes datasets collected at the last 1M steps.
 
-
-**Model options**: `conservative_q_learning`, `decision_transformer`, `trajectory_transformer` 
-
-- [Conservative Q Learning](conservative-q-learning/README.md)
-- [Decision Transformer](decision-transformer/README.md)
-- [Trajectory Transformer](trajectory-transformer/README.md)
-
-**Example**:
+<!-- **Example**:
 ```bash
 python experiments.py --game boxing --dataset mixed --model_type decision_transformer
-```
+``` -->
