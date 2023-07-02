@@ -43,7 +43,16 @@ class Trainer:
             lambda steps: min((steps+1)/self.warmup_steps, 1)
         )
         optimizers = (self.loss_optimizer, self.log_temperature_optimizer)
-        online_finetuning(model, env, optimizers, dataset.trajectories, episodes, buffer_size, gradient_iterations, save_path, device)
+        sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values = online_finetuning(model, env, optimizers, dataset.trajectories, episodes, buffer_size, gradient_iterations, save_path, device)
+
+        # write results to file, create file if it doesn't exist\
+        if not os.path.exists('online_dt_runs/results.csv'):
+            with open('online_dt_runs/results.csv', 'w') as f:
+                f.write('sum_reward,loss,cross_entropy,shannon_entropy\n')
+        with open('online_dt_runs/results.csv', 'a') as f:
+            for i in range(len(sum_reward_values)):
+                f.write(f'{sum_reward_values[i]},{loss_values[i]},{cross_entropy_values[i]},{shannon_entropy_values[i]}\n')
+        
 
 
 if __name__ == "__main__":

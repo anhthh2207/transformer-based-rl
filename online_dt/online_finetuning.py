@@ -67,6 +67,11 @@ def make_action(trajectory, model, context_len, device):
 
 
 def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device):
+    sum_reward_values = []
+    loss_values = []
+    cross_entropy_values = []
+    shannon_entropy_values = []
+
     replay_buffer = ReplayBuffer(buffer_size, offline_trajectories)
     for i in replay_buffer.trajectories:
         if type(i) != dict:
@@ -103,13 +108,17 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
                 replay_buffer.add_new_trajs(trajectory)
                 print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
                 print("Update model...")
-                update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device)
-                
+                loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device)
+                sum_reward_values.append(sum_reward)
+                loss_values.append(loss)
+                cross_entropy_values.append(cross_entropy)
+                shannon_entropy_values.append(shannon_entropy)
                 break
         
         if (episode+1) % 100 == 0:
             torch.save(pretrained_model.state_dict(), '{}/online_model_episode{}.pth'.format(save_path, episode))
-
+    
+    return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
 
 def update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size, device, batch_size=32):
     """ Update the model.
@@ -164,7 +173,8 @@ def update_model(episode, model, optimizers, replay_buffer, gradient_iterations,
             log_temperature_optimizer.step()
 
         print(f'Episode: {episode}, Iteration: {i}, Loss: {loss.item()}, Cross Entropy: {cross_entropy}, Shannon Entropy: {shannon_entropy}, Temperature: {model.temperature().item()}')
-
+    
+    return loss.item(), cross_entropy, shannon_entropy
 
 def ShannonEntropy(logits):
     probs = F.softmax(logits, dim=-1)
