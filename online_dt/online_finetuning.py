@@ -146,7 +146,7 @@ def update_model(episde, model, optimizers, replay_buffer, gradient_iterations, 
             # update temperature
             # log_temperature_optimizer = torch.optim.Adam([model.log_temperature], lr=1e-4, beta=[0.9, 0.999]).detach()
             log_temperature_optimizer.zero_grad()
-            temperature_loss = model.temperature()*(shannon_entropy - model.target_shannon_entropy).detach()
+            temperature_loss = (model.temperature().detach()) * (shannon_entropy - model.target_shannon_entropy).detach()
             temperature_loss.backward()
             log_temperature_optimizer.step()
 

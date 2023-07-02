@@ -38,7 +38,8 @@ class Trainer:
         self.log_temperature_optimizer = torch.optim.AdamW(
                         [model.log_temperature], 
                         lr=self.lr, 
-                        weight_decay=self.wt_decay
+                        weight_decay=self.wt_decay,
+                        betas=[0.9, 0.999]
                     )
         self.log_temperature_scheduler = torch.optim.lr_scheduler.LambdaLR(
             self.log_temperature_optimizer,
