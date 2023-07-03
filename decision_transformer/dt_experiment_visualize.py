@@ -3,24 +3,26 @@ import torch
 from torch.nn import functional as F
 import numpy as np
 
-from no_stack_states.utils import set_seed, AtariEnv, get_trajectory, make_action
-from no_stack_states.model import GPT, GPTConfig
+# from no_stack_states.utils import set_seed, AtariEnv, get_trajectory, make_action
+# from no_stack_states.model import GPT, GPTConfig
+from stack_states.utils import set_seed, AtariEnv, get_trajectory, make_action
+from stack_states.model import GPT, GPTConfig
 
 set_seed(123)
 
 def experiment(device):
 
-    env = AtariEnv(game='Breakout', stack=False)
+    # env = AtariEnv(game='Breakout', stack=False)
+    env = AtariEnv(game='Breakout', stack=True)
     print("Observation space:", env.observation_space)
-    # env.reset()
     
-    state_dim = env.observation_space.shape[1] # state dimension
     act_dim = env.action_space.n # action dimension
 
     conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     # Load the trained weights
-    path_to_model = "/no_stack_states/dt_runs/dt_breakout-expert-v2_model_epoch5.pt"
+    # path_to_model = "./no_stack_states/dt_runs/dt_breakout-expert-v2_model_epoch5.pt"
+    path_to_model = "./stack_states/dt_runs/dt_breakout-expert-v2_stacked_model_5.pt"
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(path_to_model))
     else:
