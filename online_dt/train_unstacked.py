@@ -63,14 +63,14 @@ class Trainer:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data_path', type=str, default='/home/ubuntu/hai.lv/Isabelle/reinforcement_learning/transformer-based-rl/data/breakout-expert-v2.pkl')
+    parser.add_argument('--data_path', type=str, default='../data/breakout-expert-v2.pkl')
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--wt_decay', type=float, default=1e-4)
     parser.add_argument('--warmup_steps', type=int, default=1000)
     parser.add_argument('--episodes', type=int, default=1500)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--trained_path', type=str, default='/home/ubuntu/hai.lv/Isabelle/reinforcement_learning/code/transformer-based-rl/online_dt/online_dt_runs/dt_breakout-expert-v2_model_epoch5.pt')
+    parser.add_argument('--trained_path', type=str, default='online_dt_runs/dt_breakout-expert-v2_model_epoch5.pt')
     parser.add_argument('--buffer_size', type=int, default=256)
     parser.add_argument('--gradient_iterations', type=int, default=10)
     parser.add_argument('--save_path', type=str, default='online_dt_runs')
