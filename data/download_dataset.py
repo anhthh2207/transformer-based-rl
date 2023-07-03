@@ -94,6 +94,7 @@ else:
 			use_timeouts = True
 
 		episode_step = 0
+		sum_reward = 0
 
 		# Loop over all samples in the dataset
 		for i in range(N//2):
@@ -112,6 +113,9 @@ else:
 						data_[k].append(dataset['observations'][i+1])
 					except IndexError:
 						data_[k].append(dataset['observations'][i])
+				elif k == 'rewards':
+					sum_reward += dataset[k][i]
+					data_[k].append(dataset[k][i])
 				else:
 					data_[k].append(dataset[k][i])
 
@@ -120,9 +124,14 @@ else:
 				episode_step = 0
 				episode_data = {}
 				for k in data_:
-					episode_data[k] = np.array(data_[k])
+					# normalize rewards
+					if k == 'rewards':
+						episode_data[k] = np.array(data_[k]) / sum_reward
+					else:
+						episode_data[k] = np.array(data_[k])
 				paths.append(episode_data)
 				data_ = collections.defaultdict(list)
+				sum_reward = 0
 			episode_step += 1
 
 		num_samples = np.sum([p['rewards'].shape[0] for p in paths])

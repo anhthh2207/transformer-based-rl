@@ -142,9 +142,7 @@ class GPT(nn.Module):
         self.block_size = config.block_size
         self.apply(self._init_weights)
 
-
-        logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
-
+        print("Number of parameters: %.2fM", sum(p.numel() for p in self.parameters())/1e6)
 
         self.state_encoder = nn.Sequential(nn.Conv2d(1, 32, 8, stride=4, padding=0), nn.ReLU(),
                                  nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
