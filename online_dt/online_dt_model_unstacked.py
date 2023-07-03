@@ -193,6 +193,7 @@ class GPT(nn.Module):
             token_embeddings = torch.zeros((states.shape[0], states.shape[1]*3 - int(targets is None), self.config.n_embd), dtype=torch.float32, device=state_embeddings.device)
             token_embeddings[:,::3,:] = rtg_embeddings
             token_embeddings[:,1::3,:] = state_embeddings
+            assert token_embeddings.shape[1] == states.shape[1]*3 - int(targets is None)
             token_embeddings[:,2::3,:] = action_embeddings[:,-states.shape[1] + int(targets is None):,:]
         elif actions is None and self.model_type == 'reward_conditioned': # only happens at very first timestep of evaluation
             rtg_embeddings = self.ret_emb(rtgs.type(torch.float32))

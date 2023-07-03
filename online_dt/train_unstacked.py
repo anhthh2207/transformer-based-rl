@@ -10,17 +10,18 @@ from tqdm import tqdm
 
 from utils import D4RLTrajectoryDataset, set_seed, AtariEnv
 from online_dt_model_unstacked import GPT, GPTConfig
-from online_finetuning import online_finetuning
+from online_finetuning import online_finetuning, online_finetuning_with_greedy_replay_buffer
 
 
 class Trainer:
-    def __init__(self, lr, wt_decay, warmup_steps):
+    def __init__(self, lr, wt_decay, warmup_steps, greedy):
         self.lr = lr
         self.wt_decay = wt_decay
         self.warmup_steps = warmup_steps
+        self.greedy = greedy
 
 
-    def train(self, data_path, env, episodes, buffer_size, gradient_iterations, model, save_path, device):
+    def train(self, data_path, env, episodes, buffer_size, gradient_iterations, model, save_path, device, sample_size):
         dataset = D4RLTrajectoryDataset(data_path)
         self.loss_optimizer = torch.optim.AdamW(
                         model.parameters(), 
@@ -43,7 +44,12 @@ class Trainer:
             lambda steps: min((steps+1)/self.warmup_steps, 1)
         )
         optimizers = (self.loss_optimizer, self.log_temperature_optimizer)
-        sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values = online_finetuning(model, env, optimizers, dataset.trajectories, episodes, buffer_size, gradient_iterations, save_path, device)
+        if self.greedy:
+            print("Fineturning with greedy buffer")
+            sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values = online_finetuning_with_greedy_replay_buffer(model, env, optimizers, dataset.trajectories, episodes, buffer_size, gradient_iterations, save_path, device, sample_size)
+        else:
+            print("Fineturning with stochastic buffer")
+            sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values = online_finetuning(model, env, optimizers, dataset.trajectories, episodes, buffer_size, gradient_iterations, save_path, device, sample_size)
 
         # write results to file, create file if it doesn't exist\
         if not os.path.exists('online_dt_runs/results.csv'):
@@ -60,15 +66,18 @@ if __name__ == "__main__":
     parser.add_argument('--data_path', type=str, default='data/breakout-expert-v2.pkl')
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--wt_decay', type=float, default=1e-4)
+    parser.add_argument('--wt_decay', type=float, default=1e-3)
     parser.add_argument('--warmup_steps', type=int, default=1000)
-    parser.add_argument('--episodes', type=int, default=1000)
+    parser.add_argument('--episodes', type=int, default=1500)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--trained_path', type=str, default='decision_transformer/dt_runs/dt_breakout-expert-v2_stacked_model_5.pt')
-    parser.add_argument('--buffer_size', type=int, default=40)
+    parser.add_argument('--trained_path', type=str, default='/home/hoanganh/Desktop/Final project/transformer-based-rl/online_dt_runs/dt_breakout-expert-v2_model_epoch5.pt')
+    parser.add_argument('--buffer_size', type=int, default=256)
     parser.add_argument('--gradient_iterations', type=int, default=10)
     parser.add_argument('--save_path', type=str, default='online_dt_runs')
     parser.add_argument('--env', type=str, default='Breakout')
+    parser.add_argument('--greedy_buffer', type=int, default=0)
+    parser.add_argument('--sample_size', type=int, default=32)
+
 
     args = parser.parse_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -86,14 +95,18 @@ if __name__ == "__main__":
     conf = GPTConfig(vocab_size=act_dim, n_layer=6, n_head=8, n_embd=128, model_type='reward_conditioned', max_timestep=10000)
     model = GPT(conf).to(device)
     # load pretrained model
-    # model.load_state_dict(torch.load(args.trained_path)) 
+    model.load_state_dict(torch.load(args.trained_path)) 
     print('Model loaded from: ', args.trained_path)
 
     # create trainer
-    trainer = Trainer(args.lr, args.wt_decay, args.warmup_steps)
+    if args.greedy_buffer == 0:
+        greedy_buffer = False
+    elif args.greedy_buffer == 1:
+        greedy_buffer = True
+    trainer = Trainer(args.lr, args.wt_decay, args.warmup_steps, greedy_buffer)
 
     # train model
-    trainer.train(args.data_path, args.env, args.episodes, args.buffer_size, args.gradient_iterations, model, args.save_path, device)
+    trainer.train(args.data_path, args.env, args.episodes, args.buffer_size, args.gradient_iterations, model, args.save_path, device, args.sample_size)
 
     # save model
     torch.save(model.state_dict(), os.path.join(args.save_path, 'online_dt.pt'))

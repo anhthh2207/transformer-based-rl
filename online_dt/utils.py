@@ -13,14 +13,6 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
-def discount_cumsum(x, gamma=1.0):
-    """ This function computes the ground truth discounted reward at each timestep
-    """
-    disc_cumsum = np.zeros_like(x)
-    disc_cumsum[-1] = x[-1]
-    for t in reversed(range(x.shape[0]-1)):
-        disc_cumsum[t] = x[t] + gamma * disc_cumsum[t+1]
-    return disc_cumsum
     
 class D4RLTrajectoryDataset(Dataset):
     """ Dataset class to get trajectories from D4RL dataset
@@ -34,7 +26,7 @@ class D4RLTrajectoryDataset(Dataset):
 
         print("Preprocessing Data")
         for i in range(len(self.trajectories)):
-            rewards = np.array(discount_cumsum(self.trajectories[i]['rewards']))
+            rewards = np.array(self.trajectories[i]['rewards'])
             observations = np.array(self.trajectories[i]['observations'])
             actions = np.array(self.trajectories[i]['actions'])
             trajectory = {'rewards': rewards, 'observations': observations, 'actions': actions}
