@@ -30,7 +30,9 @@ class D4RLTrajectoryDataset(Dataset):
             observations = np.array(self.trajectories[i]['observations'])
             actions = np.array(self.trajectories[i]['actions'])
             trajectory = {'rewards': rewards, 'observations': observations, 'actions': actions}
+            assert rewards.shape[0] == observations.shape[0] == actions.shape[0], f'Lengths of rewards, observations, actions are not equal {rewards.shape[0]}, {observations.shape[0]}, {actions.shape[0]}'
             self.trajectories[i] = trajectory
+            
         print("Preprocessing Done!!")
 
     def __len__(self):

@@ -10,25 +10,10 @@ from model import GPT, GPTConfig
 set_seed(123)
 
 def experiment(device, game):
-
-    # env = AtariEnv(game=game, stack=False)
-    # if game == 'StarGunner':
-    #     target_return = 60000
-    # elif game == 'Pong':
-    #     target_return = 20
-    # elif game == 'Qbert':
-    #     target_return = 14000
-    # elif game == 'SpaceInvaders':
-    #     target_return = 3000
-    # elif game == 'AirRaid':
-    #     target_return = 14000
-    # print("Observation space:", env.observation_space)
-    # env.reset()
-    
-    # state_dim = env.observation_space.shape[1] # state dimension
     act_dim = 6
+    max_episodes = 10
 
-    for i in range(4, 5):
+    for i in range(3,4):
         conf = GPTConfig(vocab_size=act_dim, n_layer=12, n_head=12, n_embd=264, model_type='reward_conditioned', max_timestep=10000)
         model = GPT(conf).to(device)
         # Load the trained weights
@@ -40,10 +25,9 @@ def experiment(device, game):
         model.eval()
         print("="*30, f"Model after epoch {i}", "="*30)
         print("Loaded model from:", path_to_model)
-        print("Calculating average reward over 1 episodes...")
+        print(f"Calculating average reward over {max_episodes} episodes...")
 
         for game in ['StarGunner', 'Pong', 'Qbert', 'SpaceInvaders', 'AirRaid']:
-        # for game in ['Pong', 'Qbert', 'SpaceInvaders', 'AirRaid']:
             env = AtariEnv(game=game, stack=False)
             if game == 'StarGunner':
                 target_return = 6000
@@ -56,7 +40,6 @@ def experiment(device, game):
             elif game == 'AirRaid':
                 target_return = 14000
 
-            max_episodes = 1
             cum_reward = 0
             
             for i in range(max_episodes):
@@ -78,9 +61,6 @@ def experiment(device, game):
                     trajectory = get_trajectory(trajectory, observation, action, reward, step)
                     step += 1
                     sum_reward += reward
-                    # if reward != 0: print("Reward:", reward)
-
-                    # env.render()
 
                     if terminated or step >= 10000:
                         print("-" * 60)
