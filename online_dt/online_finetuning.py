@@ -2,7 +2,7 @@ import gym
 import torch
 from torch.nn import functional as F
 import numpy as np
-
+import os
 from utils import set_seed, AtariEnv
 from replay_buffer import ReplayBuffer, GreedyReplayBuffer
 
@@ -39,7 +39,7 @@ def make_action(trajectory, model, context_len, device):
         state_dim = 84
         if len(trajectory['observations']) < context_len:
             context_len = len(trajectory['observations'])
-            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations']), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)/255.0  # the current state is given
             actions = torch.tensor(trajectory['actions'], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][0], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
@@ -48,7 +48,7 @@ def make_action(trajectory, model, context_len, device):
             # trajectory['observations'] = trajectory['observations'][-context_len:]
             # trajectory['actions'] = trajectory['actions'][-context_len+1:]
             # trajectory['rewards'] = trajectory['rewards'][-context_len:]
-            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)  # the current state is given
+            states = torch.tensor(np.array(trajectory['observations'][-context_len:]), dtype=torch.float32).reshape(1, context_len, 1, state_dim, state_dim).to(device)/255.0  # the current state is given
             actions = torch.tensor(trajectory['actions'][-context_len+1:], dtype=torch.long).reshape(1, context_len-1, 1).to(device)   # the action to the current state needs to be predicted
             timesteps = torch.tensor(trajectory['steps'][-context_len], dtype=torch.int64).reshape(1,1,1).to(device)
             rewards = get_returns(trajectory['rewards'])
@@ -85,7 +85,7 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
         observation = env.reset()
         action = make_action(trajectory, pretrained_model, 30, device)
         observation, reward, done, info = env.step(action)
-        observation = np.array(observation).reshape(1, 84, 84)/255.0
+        observation = np.array(observation).reshape(1, 84, 84)
         trajectory['observations'].append(observation)
         trajectory['rewards'].append(reward)
         trajectory['steps'].append(0)
@@ -95,16 +95,25 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
         while True:
             action = make_action(trajectory, pretrained_model, 30, device).item()
             observation, reward, done, info = env.step(action)
-            env.render()
-            observation = np.array(observation).reshape(1, 84, 84)/255.0
+            # env.render()
+            observation = np.array(observation).reshape(1, 84, 84)
             trajectory = get_trajectory(trajectory, observation, action, reward, step)
             sum_reward += reward
             step += 1
             if done or step > 10000:
-                trajectory['rewards'] = np.array(trajectory['rewards'])
-                trajectory['observations'] = np.array(trajectory['observations'])/255.0
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                    with open('{}/stochastic_oneline_reward.csv'.format(save_path), 'w') as f:
+                        f.write('episode, reward\n')
+                else:
+                    with open('{}/stochastic_oneline_reward.csv'.format(save_path), 'a') as f:
+                        f.write('{},{}\n'.format(episode, sum_reward))
+                        
                 trajectory['actions'] = np.array(trajectory['actions'])
-                trajectory['steps'] = np.array(trajectory['steps'])
+                trajectory['rewards'] = np.array(trajectory['rewards'][:trajectory['actions'].shape[0]])
+                trajectory['observations'] = np.array(trajectory['observations'][:trajectory['actions'].shape[0]])
+                trajectory['steps'] = np.array(trajectory['steps'][:trajectory['actions'].shape[0]])
+                assert trajectory['observations'].shape[0] == trajectory['actions'].shape[0] == trajectory['rewards'].shape[0] == trajectory['steps'].shape[0], f'In correct sequence length: {trajectory["observations"].shape[0]}, {trajectory["actions"].shape[0]}, {trajectory["rewards"].shape[0]}, {trajectory["steps"].shape[0]}'
                 replay_buffer.add_new_trajs(trajectory)
                 print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
                 print("Update model...")
@@ -113,6 +122,14 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
                 # loss_values.append(loss)
                 # cross_entropy_values.append(cross_entropy)
                 # shannon_entropy_values.append(shannon_entropy)
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                    # write header if not exist
+                    with open('{}/stochastic_online_finetuning.csv'.format(save_path), 'w') as f:
+                        f.write('episode, reward, loss, cross_entropy, shannon_entropy\n')
+                else:
+                    with open('{}/stochastic_online_finetuning.csv'.format(save_path), 'a') as f:
+                        f.write('{},{},{},{},{}\n'.format(episode, sum_reward, loss, cross_entropy, shannon_entropy))
                 break
         
         if (episode+1) % 50 == 0:
@@ -145,7 +162,7 @@ def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizer
         observation = env.reset()
         action = make_action(trajectory, pretrained_model, 30, device)
         observation, reward, done, info = env.step(action)
-        observation = np.array(observation).reshape(1, 84, 84)/255.0
+        observation = np.array(observation).reshape(1, 84, 84)
         trajectory['observations'].append(observation)
         trajectory['rewards'].append(reward)
         trajectory['steps'].append(0)
@@ -155,40 +172,55 @@ def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizer
         while True:
             action = make_action(trajectory, pretrained_model, 30, device).item()
             observation, reward, done, info = env.step(action)
-            env.render()
-            observation = np.array(observation).reshape(1, 84, 84)/255.0
+            # env.render()
+            observation = np.array(observation).reshape(1, 84, 84)
             trajectory = get_trajectory(trajectory, observation, action, reward, step)
             sum_reward += reward
             step += 1
             if done or step > 10000:
                 print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
                 sum_reward_values.append(sum_reward)
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                    with open('{}/greedy_oneline_reward.csv'.format(save_path), 'w') as f:
+                        f.write('episode, reward\n')
+                else:
+                    with open('{}/greedy_oneline_reward.csv'.format(save_path), 'a') as f:
+                        f.write('{},{}\n'.format(episode, sum_reward))
                 if sum_reward >= threshold:
-                # if sum_reward > 70:
-                    trajectory['rewards'] = np.array(trajectory['rewards'])
-                    trajectory['observations'] = np.array(trajectory['observations'])/255.0
                     trajectory['actions'] = np.array(trajectory['actions'])
-                    trajectory['steps'] = np.array(trajectory['steps'])
+                    trajectory['rewards'] = np.array(trajectory['rewards'][:trajectory['actions'].shape[0]])
+                    trajectory['observations'] = np.array(trajectory['observations'][:trajectory['actions'].shape[0]])
+                    trajectory['steps'] = np.array(trajectory['steps'][:trajectory['actions'].shape[0]])
+                    assert trajectory['observations'].shape[0] == trajectory['actions'].shape[0] == trajectory['rewards'].shape[0] == trajectory['steps'].shape[0], f'In correct sequence length: {trajectory["observations"].shape[0]}, {trajectory["actions"].shape[0]}, {trajectory["rewards"].shape[0]}, {trajectory["steps"].shape[0]}'
                     replay_buffer.add_new_trajs(trajectory)
                     numb_added_trajs += 1
-                    print("Add trajectory to replay buffer (Threshold: {}, Number of trajs added: {}/10)".format(threshold, numb_added_trajs))
+                    print("Add trajectory to replay buffer (Threshold: {}, Number of trajs added: {}/5)".format(threshold, numb_added_trajs))
                 
-                if numb_added_trajs >= 20:
+                if numb_added_trajs >= 5:
                     # update threshold
                     threshold = replay_buffer.third_quantile_reward()
                     print("Update threshold: ", threshold)
                     # update model
                     print("Update model...")
                     loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device, batch_size=sample_size, greedy=True)
-                    # sum_reward_values.append(sum_reward)
-                    # loss_values.append(loss)
-                    # cross_entropy_values.append(cross_entropy)
-                    # shannon_entropy_values.append(shannon_entropy)
+                    sum_reward_values.append(sum_reward)
+                    loss_values.append(loss)
+                    cross_entropy_values.append(cross_entropy)
+                    shannon_entropy_values.append(shannon_entropy)
                     numb_added_trajs = 0
+                    if not os.path.exists(save_path):
+                        os.makedirs(save_path)
+                        # write header if not exist
+                        with open('{}/greedy_online_finetuning.csv'.format(save_path), 'w') as f:
+                            f.write('episode, reward, loss, cross_entropy, shannon_entropy\n')
+                    else:
+                        with open('{}/greedy_online_finetuning.csv'.format(save_path), 'a') as f:
+                            f.write('{},{},{},{},{}\n'.format(episode, sum_reward, loss, cross_entropy, shannon_entropy))
                 break
         
         if (episode+1) % 100 == 0:
-            torch.save(pretrained_model.state_dict(), '{}/online_model_episode{}.pth'.format(save_path, episode))
+            torch.save(pretrained_model.state_dict(), '{}/greedy_online_model_episode{}.pth'.format(save_path, episode))
     
     return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
 
@@ -283,6 +315,7 @@ def formating_data(trajectories, block_size):
     rtgs = discount_cumsum(trajectories[0]['rewards'])
     timesteps = np.arange(trajectories[0]['observations'].shape[0])
     for i in range(len(trajectories)-1):
+        assert trajectories[i]['observations'].shape[0] == trajectories[i]['actions'].shape[0] == trajectories[i]['rewards'].shape[0], f'Incorrect number of samples. {trajectories[i]["observations"].shape[0]}, {trajectories[i]["actions"].shape[0]}, {trajectories[i]["rewards"].shape[0]}'
         states = np.concatenate((states, trajectories[i]['observations']), axis=0)
         actions = np.concatenate((actions, trajectories[i]['actions']))
         traj_rtgs = np.array(discount_cumsum(trajectories[i]['rewards']))
@@ -291,7 +324,7 @@ def formating_data(trajectories, block_size):
 
     # padding
     states = np.concatenate((states, np.zeros((block_size - states.shape[0]%block_size, states.shape[1], states.shape[2], states.shape[3]))), axis=0)
-    states = torch.from_numpy(states)/255.0
+    states = torch.from_numpy(states)
 
     actions = np.concatenate((actions, np.zeros(block_size - actions.shape[0]%block_size)))
     actions = torch.from_numpy(actions)

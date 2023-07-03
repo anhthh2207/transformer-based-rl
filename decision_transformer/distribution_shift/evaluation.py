@@ -28,7 +28,7 @@ def experiment(device, game):
     # state_dim = env.observation_space.shape[1] # state dimension
     act_dim = 6
 
-    for i in range(1,6):
+    for i in range(3,4):
         conf = GPTConfig(vocab_size=act_dim, n_layer=12, n_head=12, n_embd=264, model_type='reward_conditioned', max_timestep=10000)
         model = GPT(conf).to(device)
         # Load the trained weights
@@ -39,7 +39,7 @@ def experiment(device, game):
             model.load_state_dict(torch.load(path_to_model, map_location=torch.device('cpu')))
         model.eval()
         print("="*30, f"Model after epoch {i}", "="*30)
-        print("Calculating average reward over 30 episodes...")
+        print("Calculating average reward over 10 episodes...")
 
         for game in ['StarGunner', 'Pong', 'Qbert', 'SpaceInvaders', 'AirRaid']:
             env = AtariEnv(game=game, stack=False)
@@ -54,7 +54,7 @@ def experiment(device, game):
             elif game == 'AirRaid':
                 target_return = 14000
 
-            max_episodes = 30
+            max_episodes = 1
             cum_reward = 0
             
             for i in range(max_episodes):
@@ -81,7 +81,7 @@ def experiment(device, game):
                     # env.render()
 
                     if terminated or step >= 10000:
-                        print("=" * 60)
+                        print("-" * 60)
                         print("Episode:", i, "- Reward:", sum_reward, "- Steps:", step)
                         cum_reward += sum_reward
                         break
