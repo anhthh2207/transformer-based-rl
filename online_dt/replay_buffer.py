@@ -26,7 +26,6 @@ class ReplayBuffer(object):
         return len(self.trajectories)
 
     def add_new_trajs(self, new_trajs):
-        print(len(self.trajectories))
         if len(self.trajectories) < self.capacity:
             self.trajectories.append(new_trajs)
         else:
@@ -61,7 +60,6 @@ class GreedyReplayBuffer(object):
         return len(self.trajectories)
 
     def add_new_trajs(self, new_trajs):
-        print(len(self.trajectories))
         if len(self.trajectories) < self.capacity:
             self.trajectories.append(new_trajs)
         else:

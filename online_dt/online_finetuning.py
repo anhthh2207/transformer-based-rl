@@ -65,7 +65,7 @@ def make_action(trajectory, model, context_len, device):
     return action
 
 
-def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device):
+def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device, sample_size):
     sum_reward_values = []
     loss_values = []
     cross_entropy_values = []
@@ -108,7 +108,7 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
                 replay_buffer.add_new_trajs(trajectory)
                 print(f'Episode: {episode}, Reward: {sum_reward}, Steps: {step}')
                 print("Update model...")
-                loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device)
+                loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device, batch_size=sample_size)
                 # sum_reward_values.append(sum_reward)
                 # loss_values.append(loss)
                 # cross_entropy_values.append(cross_entropy)
@@ -121,14 +121,14 @@ def online_finetuning(pretrained_model, env, optimizers, offline_trajectories, e
     return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
 
 
-def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device):
+def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizers, offline_trajectories, episodes, buffer_size, gradient_iterations, save_path, device, sample_size):
     sum_reward_values = []
     loss_values = []
     cross_entropy_values = []
     shannon_entropy_values = []
 
     replay_buffer = GreedyReplayBuffer(buffer_size, offline_trajectories)
-    # print("Third quatile rewards: ", replay_buffer.third_quantile_reward())
+    print("Third quatile rewards: ", replay_buffer.third_quantile_reward())
     # x = replay_buffer.greedy_sample(5)
     for i in replay_buffer.trajectories:
         if type(i) != dict:
@@ -173,13 +173,13 @@ def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizer
                     numb_added_trajs += 1
                     print("Add trajectory to replay buffer (Threshold: {}, Number of trajs added: {}/10)".format(threshold, numb_added_trajs))
                 
-                if numb_added_trajs >= 10:
+                if numb_added_trajs >= 20:
                     # update threshold
                     threshold = replay_buffer.third_quantile_reward()
                     print("Update threshold: ", threshold)
                     # update model
                     print("Update model...")
-                    loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device, greedy=True)
+                    loss, cross_entropy, shannon_entropy = update_model(episode, pretrained_model, optimizers, replay_buffer, gradient_iterations, block_size=pretrained_model.block_size//3, device=device, batch_size=sample_size, greedy=True)
                     # sum_reward_values.append(sum_reward)
                     # loss_values.append(loss)
                     # cross_entropy_values.append(cross_entropy)
@@ -193,7 +193,7 @@ def online_finetuning_with_greedy_replay_buffer(pretrained_model, env, optimizer
     return sum_reward_values, loss_values, cross_entropy_values, shannon_entropy_values
 
 
-def update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size, device, batch_size=10, greedy=False):
+def update_model(episode, model, optimizers, replay_buffer, gradient_iterations, block_size, device, batch_size=32, greedy=False):
     """ Update the model.
     """
     assert len(replay_buffer) >= batch_size, 'Insufficient samples in replay buffer.'
@@ -214,10 +214,10 @@ def update_model(episode, model, optimizers, replay_buffer, gradient_iterations,
     actions = torch.tensor(actions, dtype=torch.long).to(device)
     rtgs = torch.tensor(rtgs, dtype=torch.float32).to(device)
 
-    sub_timesteps = torch.split(timesteps, 3, dim=0)
-    sub_states = torch.split(states, 3, dim=0)
-    sub_actions = torch.split(actions, 3, dim=0)
-    sub_rtgs = torch.split(rtgs, 3, dim=0)
+    sub_timesteps = torch.split(timesteps, 256, dim=0)
+    sub_states = torch.split(states, 256, dim=0)
+    sub_actions = torch.split(actions, 256, dim=0)
+    sub_rtgs = torch.split(rtgs, 256, dim=0)
     assert len(sub_states) == len(sub_actions) == len(sub_rtgs) == len(sub_timesteps), f'Incorrect number of sub batches. {len(sub_states)}, {len(sub_actions)}, {len(sub_rtgs)}, {len(sub_timesteps)}'
 
     for i in range(gradient_iterations):
